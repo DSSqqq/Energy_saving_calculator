@@ -13,6 +13,7 @@ const buildingABK: Building = {
   type: 'public',
   area_m2: 46.07,
   period_days: 204,
+  t_inside: 20,
   t_outside_avg: -7.1,
   r_before: 0.25,
   r_after: 0.51,
@@ -25,6 +26,7 @@ const buildingFactory: Building = {
   type: 'industrial',
   area_m2: 41.26,
   period_days: 158,
+  t_inside: 20,
   t_outside_avg: -10.0,
   r_before: 0.25,
   r_after: 0.51,
@@ -33,7 +35,6 @@ const buildingFactory: Building = {
 }
 
 const sharedDefaults: SharedParams = {
-  t_inside: 20,
   c_air: 0.24,
   k_factor: 0.8,
   gas_calorific_gcal_per_thousand_m3: 8.19,
@@ -41,9 +42,9 @@ const sharedDefaults: SharedParams = {
 }
 
 const investmentDefaults: InvestmentItem[] = [
-  { name: 'Герметик силиконовый', unit: 'тенге/м.п.', price_per_unit: 1041.2 },
-  { name: 'Уплотнительные резинки', unit: 'тенге/м.п.', price_per_unit: 193.5 },
-  { name: 'Монтажная пена и доп. материалы', unit: 'тенге/м.п.', price_per_unit: 318 },
+  { name: 'Герметик силиконовый', unit: 'тенге/м.п.', price_per_unit: 1041.2, qty_per_m2: 3.5 },
+  { name: 'Уплотнительные резинки', unit: 'тенге/м.п.', price_per_unit: 193.5, qty_per_m2: 3.5 },
+  { name: 'Монтажная пена и доп. материалы', unit: 'тенге/м.п.', price_per_unit: 318, qty_per_m2: 3.5 },
 ]
 
 const financeDefaults: FinanceParams = {
@@ -65,6 +66,7 @@ export function emptyBuilding(): Building {
     type: 'other',
     area_m2: 30,
     period_days: 180,
+    t_inside: 20,
     t_outside_avg: -8,
     r_before: 0.25,
     r_after: 0.51,
@@ -74,5 +76,5 @@ export function emptyBuilding(): Building {
 }
 
 export function emptyInvestmentItem(): InvestmentItem {
-  return { name: 'Материал', unit: 'тенге/м²', price_per_unit: 0 }
+  return { name: 'Материал', unit: 'тенге/м.п.', price_per_unit: 0, qty_per_m2: 3.5 }
 }

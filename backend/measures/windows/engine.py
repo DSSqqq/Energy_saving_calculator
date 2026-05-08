@@ -38,8 +38,12 @@ from ..finance.npv import (
 
 # --- Per-building helpers ------------------------------------------------------
 
-def _q_transmission_gcal(*, area, dt, period_days, r_before, r_after) -> float:
-    return area * dt * period_days * 24.0 * (1.0 / r_before - 1.0 / r_after) / 1_000_000.0
+def _q_kwh(*, area, dt, period_days, r) -> float:
+    return (area / r) * dt * 0.001 * period_days * 24.0
+
+
+def _q_transmission_gcal(*, q1_kwh, q2_kwh) -> float:
+    return (q1_kwh - q2_kwh) * 860.421 / 1_000_000.0
 
 
 def _q_specific_inf_kcal_per_m2_h(*, c_air, g_inf, k_factor, dt) -> float:
@@ -56,7 +60,6 @@ def _q_infiltration_gcal(*, q_before, q_after, area, period_days) -> float:
 def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     shared = payload["shared"]
     finance = payload["finance"]
-    t_in = shared["t_inside"]
     c_air = shared["c_air"]
     k_factor = shared["k_factor"]
     a_gas = shared["gas_calorific_gcal_per_thousand_m3"]
@@ -66,14 +69,15 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     total_area = 0.0
     total_q_gcal = 0.0
     for b in payload["buildings"]:
+        t_in = b["t_inside"]
         dt = t_in - b["t_outside_avg"]
-        q_t = _q_transmission_gcal(
-            area=b["area_m2"],
-            dt=dt,
-            period_days=b["period_days"],
-            r_before=b["r_before"],
-            r_after=b["r_after"],
+        q1_kwh = _q_kwh(
+            area=b["area_m2"], dt=dt, period_days=b["period_days"], r=b["r_before"]
         )
+        q2_kwh = _q_kwh(
+            area=b["area_m2"], dt=dt, period_days=b["period_days"], r=b["r_after"]
+        )
+        q_t = _q_transmission_gcal(q1_kwh=q1_kwh, q2_kwh=q2_kwh)
         q_inf_before = _q_specific_inf_kcal_per_m2_h(
             c_air=c_air, g_inf=b["g_inf_before"], k_factor=k_factor, dt=dt
         )
@@ -96,11 +100,14 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "area_m2": b["area_m2"],
                 "period_days": b["period_days"],
                 "t_outside_avg": b["t_outside_avg"],
+                "t_inside": b["t_inside"],
                 "r_before": b["r_before"],
                 "r_after": b["r_after"],
                 "g_inf_before": b["g_inf_before"],
                 "g_inf_after": b["g_inf_after"],
                 "delta_t": dt,
+                "q1_kwh": q1_kwh,
+                "q2_kwh": q2_kwh,
                 "q_transmission_gcal": q_t,
                 "q_inf_specific_before": q_inf_before,
                 "q_inf_specific_after": q_inf_after,
@@ -121,14 +128,16 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     investment_rows: List[Dict[str, Any]] = []
     investment_total = 0.0
     for item in payload["investment_items"]:
-        cost = item["price_per_unit"] * total_area
+        qty_per_m2 = item.get("qty_per_m2", 1.0)
+        total_quantity = total_area * qty_per_m2
+        cost = item["price_per_unit"] * total_quantity
         investment_total += cost
         investment_rows.append(
             {
                 "name": item["name"],
                 "unit": item["unit"],
                 "price_per_unit": item["price_per_unit"],
-                "quantity": total_area,
+                "quantity": total_quantity,
                 "cost_tg": cost,
             }
         )

@@ -21,6 +21,7 @@ class BuildingInputSerializer(serializers.Serializer):
     )
     area_m2 = serializers.FloatField(min_value=0.01)
     period_days = serializers.FloatField(min_value=1, max_value=365)
+    t_inside = serializers.FloatField(min_value=-50, max_value=50, default=20.0)
     t_outside_avg = serializers.FloatField(min_value=-60, max_value=20)
     r_before = serializers.FloatField(min_value=0.01)
     r_after = serializers.FloatField(min_value=0.01)
@@ -42,7 +43,6 @@ class BuildingInputSerializer(serializers.Serializer):
 class SharedParamsSerializer(serializers.Serializer):
     """Общие константы расчёта и тарифы. Все редактируемые в UI."""
 
-    t_inside = serializers.FloatField(default=20.0)
     c_air = serializers.FloatField(default=0.24, help_text="Удельная теплоёмкость воздуха, ккал/(кг·°С)")
     k_factor = serializers.FloatField(default=0.8, help_text="Коэф. влияния встречного теплового потока")
     gas_calorific_gcal_per_thousand_m3 = serializers.FloatField(
@@ -59,6 +59,7 @@ class InvestmentItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     unit = serializers.CharField(max_length=50, default="тенге/м²")
     price_per_unit = serializers.FloatField(min_value=0)
+    qty_per_m2 = serializers.FloatField(min_value=0, default=1.0)
 
 
 class FinanceParamsSerializer(serializers.Serializer):

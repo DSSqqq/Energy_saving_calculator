@@ -26,13 +26,14 @@ from typing import Any, Dict
 
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Cm
 
 from ..docx_utils.builder import (
     add_body_paragraph,
     add_caption,
     add_heading_para,
     make_audit_table,
+    add_runs_with_highlight,
 )
 from ..docx_utils.chart import render_npv_chart
 from ..docx_utils.number_fmt import (
@@ -75,11 +76,14 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     add_body_paragraph(doc, _INTRO_AFTER_TABLE_1)
     add_body_paragraph(doc, _INTRO_BEFORE_INPUTS)
 
-    _section_table_2(doc, payload, results)
-
-    for building in results["buildings"]:
-        _section_per_building_transmission(doc, building)
-        _section_per_building_infiltration(doc, building, payload["shared"])
+    if results["buildings"]:
+        first_building = results["buildings"][0]
+        _section_per_building_transmission(doc, first_building)
+        _section_per_building_infiltration(doc, first_building, payload["shared"])
+        
+        if len(results["buildings"]) > 1:
+            add_body_paragraph(doc, "Для остальных зданий расчёт выполняется аналогично.")
+            doc.add_paragraph()
 
     _section_totals(doc, payload, results)
     _section_table_3(doc, results)
@@ -134,38 +138,32 @@ def _add_equation(doc, omml_element) -> None:
     p._p.append(omml_element)
 
 def _bullet_paragraph(doc, text: str) -> None:
-    """Маркеро-подобная строка в исходных данных (без буллета — как в шаблоне)."""
-    add_body_paragraph(doc, text, first_line_indent=False)
+    """Маркеро-подобная строка в исходных данных (с родным буллетом Word)."""
+    p = doc.add_paragraph(style="List Bullet")
+    
+    p.paragraph_format.left_indent = Cm(1.89)
+    p.paragraph_format.first_line_indent = Cm(-0.63)
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.space_before = Pt(0)
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+    
+    run = p.add_run(text)
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(12)
 
 
 # --- секции -------------------------------------------------------------------
 
 def _section_table_1(doc, results: Dict[str, Any]) -> None:
-            # --- РУЧНОЕ СОЗДАНИЕ ПОДПИСИ ТАБЛИЦЫ ---
-    p_cap = doc.add_paragraph()
-    p_cap.paragraph_format.first_line_indent = None
-    p_cap.paragraph_format.space_before = Pt(6)
-    p_cap.paragraph_format.space_after = Pt(0)
-    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-    
-    run_cap = p_cap.add_run("Таблица 3.3.6.1 – Площадь проблемных участков оконных блоков")
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False   # Не жирный
-    run_cap.italic = True  # Курсив
-    # ---------------------------------------
-    rows = [(b["name"], fmt_num(b["area_m2"], 2)) for b in results["buildings"]]
-    rows.append(("ИТОГО", fmt_num(results["totals"]["area_m2"], 2)))
-    make_audit_table(
-        doc,
-        ["Наименование здания", "Площадь проблемных участков, м²"],
-        rows,
-        numeric_columns=[1],
-    )
-    doc.add_paragraph() # <--- Пустая строка
+    from docx.enum.section import WD_SECTION, WD_ORIENT
 
-def _section_table_2(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> None:
-    doc.add_paragraph() # <--- Пустая строка
+    # --- ПЕРЕВОДИМ СТРАНИЦУ В АЛЬБОМНУЮ ОРИЕНТАЦИЮ ---
+    landscape_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    landscape_section.orientation = WD_ORIENT.LANDSCAPE
+    new_width, new_height = landscape_section.page_height, landscape_section.page_width
+    landscape_section.page_width = new_width
+    landscape_section.page_height = new_height
+
     # --- РУЧНОЕ СОЗДАНИЕ ПОДПИСИ ТАБЛИЦЫ ---
     p_cap = doc.add_paragraph()
     p_cap.paragraph_format.first_line_indent = None
@@ -173,47 +171,51 @@ def _section_table_2(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> N
     p_cap.paragraph_format.space_after = Pt(0)
     p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    run_cap = p_cap.add_run("Таблица 3.3.6.2 - Исходные данные")
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False   # Не жирный
-    run_cap.italic = True  # Курсив
+    add_runs_with_highlight(p_cap, "Таблица 3.3.6.1 - Исходные данные", italic=True)
     # ---------------------------------------
-    shared = payload["shared"]
-    total_area = results["totals"]["area_m2"]
-    base = results["buildings"][0]
-    rows = [
-        ("Площадь остекления изношенных окон", "м²", fmt_num(total_area, 2)),
-        (
-            "Фактическое сопротивление теплопередаче существующих окон",
-            "м²·°С/Вт",
-            fmt_num(base["r_before"], 2),
-        ),
-        (
-            "Сопротивление теплопередаче предлагаемых к установке окон",
-            "м²·°С/Вт",
-            fmt_num(base["r_after"], 2),
-        ),
-        ("Температура внутри помещения", "°С", fmt_num(shared["t_inside"], 1)),
-    ]
+    rows = []
     for b in results["buildings"]:
-        rows.append(
-            (
-                f"Продолжительность отопительного периода, {b['name']}",
-                "сут.",
-                fmt_num(b["period_days"], 0),
-            )
-        )
-        rows.append(
-            (
-                f"Средняя температура наружного воздуха за {fmt_num(b['period_days'], 0)} сут. ({b['name']})",
-                "°С",
-                fmt_num(b["t_outside_avg"], 1),
-            )
-        )
-    make_audit_table(doc, ["Параметры", "Ед. изм-я", "Значение"], rows, numeric_columns=[2],
-    col_widths=[Cm(13), Cm(2), Cm(2)])
+        rows.append((
+            b["name"],
+            fmt_num(b["area_m2"], 2),
+            fmt_num(b["r_before"], 2),
+            fmt_num(b["r_after"], 2),
+            fmt_num(b["period_days"], 0),
+            fmt_num(b["t_inside"], 1),
+            fmt_num(b["t_outside_avg"], 1),
+        ))
+    
+    rows.append((
+        "ИТОГО",
+        fmt_num(results["totals"]["area_m2"], 2),
+        "-", "-", "-", "-", "-"
+    ))
+    
+    headers = [
+        "Наименование здания",
+        "Площадь проблемных участков, м²",
+        "Фактическое сопротивление теплопередаче окон до мероприятия, м²·°С/Вт",
+        "Сопротивление теплопередаче окон после мероприятия, м²·°С/Вт",
+        "Продолжительность отопительного периода, сут.",
+        "Температура внутри помещения, °С",
+        "Средняя температура наружного воздуха за отопительный период, °С"
+    ]
+    
+    make_audit_table(
+        doc,
+        headers,
+        rows,
+        numeric_columns=[1, 2, 3, 4, 5, 6],
+        col_widths=[Cm(3), Cm(3), Cm(4), Cm(4), Cm(3), Cm(3), Cm(4)]
+    )
     doc.add_paragraph() # <--- Пустая строка
+    
+    # --- ВОЗВРАЩАЕМ КНИЖНУЮ ОРИЕНТАЦИЮ ДЛЯ СЛЕДУЮЩИХ РАЗДЕЛОВ ---
+    portrait_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    portrait_section.orientation = WD_ORIENT.PORTRAIT
+    p_width, p_height = portrait_section.page_height, portrait_section.page_width
+    portrait_section.page_width = p_width
+    portrait_section.page_height = p_height
 
 
 def _section_per_building_transmission(doc, b: Dict[str, Any]) -> None:
@@ -224,23 +226,44 @@ def _section_per_building_transmission(doc, b: Dict[str, Any]) -> None:
     add_body_paragraph(doc, "Исходные данные:", first_line_indent=False)
     _bullet_paragraph(doc, f"Площадь светопрозрачных ограждений: S = {fmt_num(b['area_m2'], 2)} м²")
     _bullet_paragraph(doc, f"Средняя наружная температура: t_н = {fmt_num(b['t_outside_avg'], 1)} °С")
-    _bullet_paragraph(doc, f"Внутренняя температура: t_в = {fmt_num(b['delta_t'] + b['t_outside_avg'], 1)} °С")
+    _bullet_paragraph(doc, f"Внутренняя температура: t_в = {fmt_num(b['t_inside'], 1)} °С")
     _bullet_paragraph(doc, f"Продолжительность отопительного периода: z = {fmt_num(b['period_days'], 0)} сут.")
     _bullet_paragraph(doc, f"Сопротивление теплопередаче до мероприятия: R_до = {fmt_num(b['r_before'], 2)} м²·°С/Вт")
     _bullet_paragraph(doc, f"Сопротивление теплопередаче после мероприятия: R_после = {fmt_num(b['r_after'], 2)} м²·°С/Вт")
-    add_body_paragraph(
-        doc,
-        "Экономия тепловой энергии за счёт повышения сопротивления теплопередаче:",
-    )
-    doc.add_paragraph() # <--- Пустая строка
+    add_body_paragraph(doc, "Теплопотери до мероприятия:")
     _add_equation(
         doc,
-        eq.eq_q_t(
+        eq.eq_q_kwh(
+            subscript="1",
             area=fmt_num(b["area_m2"], 2),
-            delta_t=fmt_num(b["delta_t"], 2),
+            r_val=fmt_num(b["r_before"], 2),
+            t_in=fmt_num(b["delta_t"] + b["t_outside_avg"], 1),
+            t_out_avg=fmt_num(b["t_outside_avg"], 1),
             period_days=fmt_num(b["period_days"], 0),
-            r_before=fmt_num(b["r_before"], 2),
-            r_after=fmt_num(b["r_after"], 2),
+            result_kwh=fmt_num(b["q1_kwh"], 1),
+        ),
+    )
+    
+    add_body_paragraph(doc, "Теплопотери после мероприятия:")
+    _add_equation(
+        doc,
+        eq.eq_q_kwh(
+            subscript="2",
+            area=fmt_num(b["area_m2"], 2),
+            r_val=fmt_num(b["r_after"], 2),
+            t_in=fmt_num(b["delta_t"] + b["t_outside_avg"], 1),
+            t_out_avg=fmt_num(b["t_outside_avg"], 1),
+            period_days=fmt_num(b["period_days"], 0),
+            result_kwh=fmt_num(b["q2_kwh"], 1),
+        ),
+    )
+    
+    add_body_paragraph(doc, "Экономия тепловой энергии, Гкал:")
+    _add_equation(
+        doc,
+        eq.eq_delta_q(
+            q1=fmt_num(b["q1_kwh"], 1),
+            q2=fmt_num(b["q2_kwh"], 1),
             result_gcal=fmt_num(b["q_transmission_gcal"], 2),
         ),
     )
@@ -390,18 +413,15 @@ def _section_table_3(doc, results: Dict[str, Any]) -> None:
     p_cap.paragraph_format.space_after = Pt(0)
     p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    run_cap = p_cap.add_run("Таблица 3.3.6.3 - Материалы и ориентировочная стоимость утепления")
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False   # Не жирный
-    run_cap.italic = True  # Курсив
+    add_runs_with_highlight(p_cap, "Таблица 3.3.6.3 - Материалы и ориентировочная стоимость утепления", italic=True)
     # ---------------------------------------
     rows = []
     for item in results["investment"]["items"]:
+        unit_str = item['unit'].split('/')[-1] if '/' in item['unit'] else "ед."
         rows.append(
             (
                 item["name"],
-                f"{fmt_num(item['quantity'], 2)} м²",
+                f"{fmt_num(item['quantity'], 2)} {unit_str}",
                 f"{fmt_num(item['price_per_unit'], 2)} {item['unit']}",
                 fmt_money(item["cost_tg"]),
             )
@@ -423,11 +443,7 @@ def _section_table_4(doc, results: Dict[str, Any]) -> None:
     p_cap.paragraph_format.space_after = Pt(0)
     p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    run_cap = p_cap.add_run("Таблица 3.3.6.4 – Экономия тепловой энергии в Гкал и денежном эквиваленте")
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False   # Не жирный
-    run_cap.italic = True  # Курсив
+    add_runs_with_highlight(p_cap, "Таблица 3.3.6.4 – Экономия тепловой энергии в Гкал и денежном эквиваленте", italic=True)
     # ---------------------------------------
     rows = []
     for b in results["buildings"]:
@@ -469,11 +485,7 @@ def _section_table_finance(doc, results: Dict[str, Any]) -> None:
     p_cap.paragraph_format.space_after = Pt(0)
     p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    run_cap = p_cap.add_run("Таблица 3.3.1.1 - Показатели эффективности проекта")
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False   # Не жирный
-    run_cap.italic = True  # Курсив
+    add_runs_with_highlight(p_cap, "Таблица 3.3.1.1 - Показатели эффективности проекта", italic=True)
     # ---------------------------------------
     f = results["finance"]
     rows = [
@@ -523,14 +535,6 @@ def _section_chart(doc, results: Dict[str, Any]) -> None:
     p_cap.paragraph_format.space_before = Pt(6) # Небольшой отступ между графиком и подписью
     p_cap.paragraph_format.space_after = Pt(12)
     p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-    # Создаем объект run_cap и сразу пишем в него текст
-    run_cap = p_cap.add_run(
-        "Диаграмма 3.3.1.1 – Чистая приведённая стоимость проекта мероприятия по "
-        "улучшению теплозащитных свойств оконных блоков"
-    )
-    # Настройки шрифта:
-    run_cap.font.name = "Times New Roman"
-    run_cap.font.size = Pt(12)
-    run_cap.bold = False     # Не жирный
-    run_cap.italic = True    # Курсив
+    add_runs_with_highlight(p_cap, "Диаграмма 3.3.1.1 – Чистая приведённая стоимость проекта мероприятия по "
+        "улучшению теплозащитных свойств оконных блоков", italic=True)
     # -----------------------------------------------

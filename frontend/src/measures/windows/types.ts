@@ -27,6 +27,7 @@ export type Building = {
   type: BuildingType
   area_m2: number
   period_days: number
+  t_inside: number
   t_outside_avg: number
   r_before: number
   r_after: number
@@ -35,7 +36,6 @@ export type Building = {
 }
 
 export type SharedParams = {
-  t_inside: number
   c_air: number
   k_factor: number
   gas_calorific_gcal_per_thousand_m3: number
@@ -46,6 +46,7 @@ export type InvestmentItem = {
   name: string
   unit: string
   price_per_unit: number
+  qty_per_m2: number
 }
 
 export type FinanceParams = {

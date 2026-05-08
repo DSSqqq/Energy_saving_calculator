@@ -30,6 +30,7 @@ export function InvestmentTable({ items, onChange }: Props) {
           <tr>
             <th>Материал</th>
             <th>Ед. изм.</th>
+            <th>Расход на 1 м²</th>
             <th>Цена за ед.</th>
             <th />
           </tr>
@@ -49,6 +50,17 @@ export function InvestmentTable({ items, onChange }: Props) {
                   type="text"
                   value={it.unit}
                   onChange={(e) => update(idx, { unit: e.target.value })}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  step="any"
+                  min={0}
+                  value={Number.isFinite(it.qty_per_m2) ? it.qty_per_m2 : ''}
+                  onChange={(e) =>
+                    update(idx, { qty_per_m2: Number(e.target.value) })
+                  }
                 />
               </td>
               <td>

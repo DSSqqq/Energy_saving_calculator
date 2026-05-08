@@ -180,47 +180,63 @@ def _equals_with_value(value_text: str) -> list[etree._Element]:
     return [m_op(" = "), m_num(value_text)]
 
 
-def eq_q_t(
+def eq_q_kwh(
     *,
+    subscript: str,
     area: str,
-    delta_t: str,
+    r_val: str,
+    t_in: str,
+    t_out_avg: str,
     period_days: str,
-    r_before: str,
-    r_after: str,
-    result_gcal: str,
+    result_kwh: str,
 ) -> etree._Element:
-    """Разбитая на две строки формула Q_т."""
+    """`Q_{sub} = S / R_{sub} * (t_вн - t_н.ср) * 10^-3 * N_от * 24 = ... кВт*ч`"""
     
-    # Первая строка: формула с буквами
     line1 = [
-        m_sub([m_var("Q")], [m_var("т")]),
+        m_sub([m_var("Q")], [m_num(subscript)]),
         m_op(" = "),
-        m_var("S"), m_op(" · "),
-        m_paren([m_sub([m_var("t")], [m_var("в")]), m_op(" − "), m_sub([m_var("t")], [m_var("н")])]),
-        m_op(" · "), m_var("z"), m_op(" · "), m_num("24"), m_op(" · "),
-        m_paren([
-            m_frac([m_num("1")], [m_sub([m_var("R")], [m_num("до")])]),
-            m_op(" − "),
-            m_frac([m_num("1")], [m_sub([m_var("R")], [m_num("после")])]),
-        ]),
-        m_op(" / "), m_sup([m_num("10")], [m_num("6")]),
+        m_frac([m_var("S")], [m_sub([m_var("R")], [m_num(subscript)])]),
+        m_op(" · "), m_paren([m_sub([m_var("t")], [m_run("вн")]), m_op(" − "), m_sub([m_var("t")], [m_run("н.ср")])]),
+        m_op(" · "), m_sup([m_num("10")], [m_op("−"), m_num("3")]),
+        m_op(" · "), m_sub([m_var("N")], [m_run("от")]), m_op(" · "), m_num("24"),
     ]
     
-    # Вторая строка: подстановка цифр и ответ
+    t_out_fmt = f"({t_out_avg})" if t_out_avg.startswith("-") else t_out_avg
+    
     line2 = [
         m_op(" = "),
-        m_num(area), m_op(" · "), m_num(delta_t), m_op(" · "),
-        m_num(period_days), m_op(" · "), m_num("24"), m_op(" · "),
-        m_paren([
-            m_frac([m_num("1")], [m_num(r_before)]),
-            m_op(" − "),
-            m_frac([m_num("1")], [m_num(r_after)]),
-        ]),
-        m_op(" / "), m_sup([m_num("10")], [m_num("6")]),
+        m_frac([m_num(area)], [m_num(r_val)]),
+        m_op(" · "), m_paren([m_num(t_in), m_op(" − "), m_num(t_out_fmt)]),
+        m_op(" · "), m_sup([m_num("10")], [m_op("−"), m_num("3")]),
+        m_op(" · "), m_num(period_days), m_op(" · "), m_num("24"),
+        m_op(" = "), m_num(result_kwh), m_op(" кВт·ч"),
+    ]
+    
+    return _eq(m_eqArr([line1, line2]))
+
+
+def eq_delta_q(
+    *,
+    q1: str,
+    q2: str,
+    result_gcal: str,
+) -> etree._Element:
+    """`ΔQ = (Q_1 - Q_2) * 860,421 * 10^-6 = ... Гкал`"""
+    
+    line1 = [
+        m_var("ΔQ"),
+        m_op(" = "),
+        m_paren([m_sub([m_var("Q")], [m_num("1")]), m_op(" − "), m_sub([m_var("Q")], [m_num("2")])]),
+        m_op(" · "), m_num("860,421"), m_op(" · "), m_sup([m_num("10")], [m_op("−"), m_num("6")]),
+    ]
+    
+    line2 = [
+        m_op(" = "),
+        m_paren([m_num(q1), m_op(" − "), m_num(q2)]),
+        m_op(" · "), m_num("860,421"), m_op(" · "), m_sup([m_num("10")], [m_op("−"), m_num("6")]),
         m_op(" = "), m_num(result_gcal), m_op(" Гкал"),
     ]
     
-    # Собираем их через m_eqArr
     return _eq(m_eqArr([line1, line2]))
 
 def eq_q_inf_specific(

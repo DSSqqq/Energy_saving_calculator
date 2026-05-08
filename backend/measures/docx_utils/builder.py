@@ -23,6 +23,8 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.shared import Cm, Pt, Emu
+from docx.enum.text import WD_COLOR_INDEX
+import re
 
 
 # Размер первой строки абзаца в исходнике — 450215 EMU ≈ 1,25 см.
@@ -42,6 +44,17 @@ def _set_run_font(run, *, bold: bool = False, italic: bool = False) -> None:
     run.bold = bold
     run.italic = italic
 
+def add_runs_with_highlight(p, text: str, bold: bool = False, italic: bool = False) -> None:
+    """Разбивает текст и подсвечивает номера (например 3.3.6.1) желтым маркером."""
+    pattern = re.compile(r'(3\.3(?:\.\d+)+)')
+    for part in pattern.split(text):
+        if not part:
+            continue
+        run = p.add_run(part)
+        _set_run_font(run, bold=bold, italic=italic)
+        if pattern.match(part):
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+
 
 def add_body_paragraph(
     doc: _DocumentType,
@@ -60,8 +73,7 @@ def add_body_paragraph(
     pf.line_spacing = 1.0
     p.alignment = align
     if text:
-        run = p.add_run(text)
-        _set_run_font(run, bold=bold)
+        add_runs_with_highlight(p, text, bold=bold)
 
 
 def add_caption(doc: _DocumentType, text: str) -> None:
@@ -73,8 +85,7 @@ def add_caption(doc: _DocumentType, text: str) -> None:
     pf.space_before = Pt(6)
     pf.line_spacing = 1.0
     p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-    run = p.add_run(text)
-    _set_run_font(run, bold=True)
+    add_runs_with_highlight(p, text, bold=True)
 
 
 def add_heading_para(doc: _DocumentType, text: str) -> None:
@@ -89,8 +100,7 @@ def add_heading_para(doc: _DocumentType, text: str) -> None:
     pf.space_before = Pt(0)
     pf.line_spacing = 1.0
     p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-    run = p.add_run(text)
-    _set_run_font(run, bold=True)
+    add_runs_with_highlight(p, text, bold=True)
 
 
 # --- таблицы ------------------------------------------------------------------

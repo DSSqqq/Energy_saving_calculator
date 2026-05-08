@@ -18,12 +18,7 @@ export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceCha
         <h2>Общие параметры расчёта</h2>
       </header>
       <div className="grid">
-        <Field
-          label="Внутр. температура t_в, °C"
-          value={shared.t_inside}
-          onChange={(v) => onSharedChange(patch(shared, 't_inside', v))}
-          step={0.1}
-        />
+
         <Field
           label="Удельная теплоёмкость c, ккал/(кг·°С)"
           value={shared.c_air}

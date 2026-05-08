@@ -98,6 +98,12 @@ export function BuildingsList({ buildings, onChange }: Props) {
                 step={0.1}
               />
               <NumberField
+                label="Внутренняя t, °C"
+                value={b.t_inside}
+                onChange={(v) => update(idx, { t_inside: v })}
+                step={0.1}
+              />
+              <NumberField
                 label="R до, м²·°C/Вт"
                 value={b.r_before}
                 onChange={(v) => update(idx, { r_before: v })}
