@@ -21,27 +21,27 @@ def npv(*, rate: float, cash_flow: float, years: int, investment: float) -> floa
     return s - investment
 
 
-def dpi(*, rate: float, cash_flow: float, years: int, investment: float) -> float:
+def dpi(*, rate: float, cash_flow: float, years: int, investment: float) -> float | None:
     """Дисконтированный индекс доходности: (NPV + investment) / investment."""
     if investment <= 0:
-        return float("inf")
+        return None
     pv_inflows = npv(rate=rate, cash_flow=cash_flow, years=years, investment=0.0)
     return pv_inflows / investment
 
 
-def simple_payback_period(*, cash_flow: float, investment: float) -> float:
-    """Простой срок окупаемости (лет). Бесконечность, если CF <= 0."""
+def simple_payback_period(*, cash_flow: float, investment: float) -> float | None:
+    """Простой срок окупаемости (лет). None, если CF <= 0."""
     if cash_flow <= 0:
-        return float("inf")
+        return None
     return investment / cash_flow
 
 
 def discounted_payback_period(
     *, rate: float, cash_flow: float, years: int, investment: float
-) -> float:
+) -> float | None:
     """
     Дисконтированный срок окупаемости с линейной интерполяцией внутри последнего года.
-    Возвращает inf, если за горизонт проект не окупается.
+    Возвращает None, если за горизонт проект не окупается.
     """
     cumulative = 0.0
     for t in range(1, years + 1):
@@ -52,7 +52,7 @@ def discounted_payback_period(
             need = investment - cumulative
             return (t - 1) + (need / dcf if dcf else 0.0)
         cumulative = new_cum
-    return float("inf")
+    return None
 
 
 def irr(
