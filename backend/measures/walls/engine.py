@@ -1,15 +1,6 @@
 """
 Расчёт мероприятия «Стены»: улучшение теплозащитных свойств наружных стен.
-
-Формулы:
-- ΔT      = t_in − t_out
-- Q_до   = (area / R_до) × ΔT × 0.001 × z × 24     [кВт·ч/год]
-- Q_после = (area / R_после) × ΔT × 0.001 × z × 24  [кВт·ч/год]
-- ΔQ_кВтч = Q_до − Q_после
-- ΔQ_Гкал = ΔQ_кВтч × 860.421 / 1_000_000
-
-Перевод в природный газ: V_газа [тыс. м³] = ΔQ_Гкал / a, где a — теплотворная (Гкал/тыс.м³).
-Деньги: CF = V_газа × 1000 × тариф [тг/м³].
+Поддерживает множественные типы топлива (газ, электричество, уголь, дизель, центральное отопление).
 """
 from __future__ import annotations
 
@@ -38,8 +29,10 @@ def _q_transmission_gcal(*, q1_kwh: float, q2_kwh: float) -> float:
 def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     shared = payload["shared"]
     finance = payload["finance"]
-    a_gas = shared["gas_calorific_gcal_per_thousand_m3"]
-    tariff_type = shared.get("tariff_type", "gcal")
+    
+    fuel_type = shared.get("fuel_type", "gcal")
+    fuel_tariff = shared.get("fuel_tariff", 0.0)
+    fuel_calorific = shared.get("fuel_calorific", 1.0)
 
     buildings_out: List[Dict[str, Any]] = []
     total_area = 0.0
@@ -78,12 +71,11 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-    gas_thousand_m3 = total_q_gcal / a_gas if a_gas else 0.0
+    # Расчет экономии топлива и денег
+    fuel_savings = total_q_gcal / fuel_calorific if fuel_calorific else 0.0
     
-    if tariff_type == "gas":
-        money_savings_tg = gas_thousand_m3 * 1000.0 * shared["tariff_tg_per_m3"]
-    else:  # "gcal"
-        money_savings_tg = total_q_gcal * shared["tariff_tg_per_gcal"]
+    multiplier = 1000.0 if fuel_type in ("gas", "electricity") else 1.0
+    money_savings_tg = fuel_savings * multiplier * fuel_tariff
 
     # Денежная экономия по зданиям пропорционально доле энергии.
     for row in buildings_out:
@@ -123,13 +115,23 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     total_quantity = sum(r["quantity"] for r in investment_rows)
 
+    FUEL_UNITS = {
+        "gas": "тыс. м³",
+        "electricity": "тыс. кВт·ч",
+        "coal": "тонн",
+        "diesel": "тонн",
+        "gcal": "Гкал",
+    }
+    fuel_unit = FUEL_UNITS.get(fuel_type, "Гкал")
+
     return {
         "buildings": buildings_out,
         "totals": {
             "area_m2": total_area,
             "quantity_m2": total_quantity,
             "q_total_gcal": total_q_gcal,
-            "gas_thousand_m3": gas_thousand_m3,
+            "fuel_savings": fuel_savings,
+            "fuel_unit": fuel_unit,
             "money_savings_tg": money_savings_tg,
         },
         "investment": {

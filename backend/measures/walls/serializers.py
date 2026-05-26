@@ -37,19 +37,18 @@ class BuildingInputSerializer(serializers.Serializer):
 class SharedParamsSerializer(serializers.Serializer):
     """Общие константы расчёта и тарифы."""
 
-    gas_calorific_gcal_per_thousand_m3 = serializers.FloatField(
-        default=8.19, help_text="Теплотворная способность газа, Гкал на 1000 м³"
-    )
-    tariff_tg_per_m3 = serializers.FloatField(
-        default=49.90, help_text="Тариф (тенге за 1 м³ природного газа)"
-    )
-    tariff_tg_per_gcal = serializers.FloatField(
-        default=6761.45, help_text="Тариф (тенге за 1 Гкал тепловой энергии)"
-    )
-    tariff_type = serializers.ChoiceField(
-        choices=[("gas", "Природный газ"), ("gcal", "Тепловая энергия")],
+    fuel_type = serializers.ChoiceField(
+        choices=[
+            ("gas", "Природный газ"),
+            ("electricity", "Электрическая энергия"),
+            ("coal", "Каменный уголь"),
+            ("diesel", "Дизельное топливо"),
+            ("gcal", "Центральное теплоснабжение"),
+        ],
         default="gcal"
     )
+    fuel_tariff = serializers.FloatField(min_value=0.0)
+    fuel_calorific = serializers.FloatField(min_value=0.00001)
 
 
 class InvestmentItemSerializer(serializers.Serializer):

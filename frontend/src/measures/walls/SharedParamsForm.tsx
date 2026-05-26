@@ -1,15 +1,67 @@
 /**
  * Форма общих параметров для мероприятия «Стены».
- * Отличие от «Окна»: нет c_air, k_factor (инфильтрация не используется).
- * Добавлен выбор базы расчёта тарифа (природный газ или тепловая энергия).
+ * Поддерживает динамический выбор источника теплоснабжения и автозаполнение его параметров.
  */
-import type { SharedParams, FinanceParams } from './types'
+import type { SharedParams, FinanceParams, FuelType } from './types'
 
 type Props = {
   shared: SharedParams
   finance: FinanceParams
   onSharedChange: (next: SharedParams) => void
   onFinanceChange: (next: FinanceParams) => void
+}
+
+export const FUEL_META: Record<
+  FuelType,
+  {
+    label: string
+    fuelUnit: string
+    tariffUnit: string
+    cvUnit: string
+    defaultCV: number
+    defaultTariff: number
+  }
+> = {
+  gcal: {
+    label: 'Центральное отопление / теплосеть',
+    fuelUnit: 'Гкал',
+    tariffUnit: 'тг/Гкал',
+    cvUnit: 'Гкал/Гкал',
+    defaultCV: 1.0,
+    defaultTariff: 6761.45,
+  },
+  gas: {
+    label: 'Природный газ',
+    fuelUnit: 'тыс. м³',
+    tariffUnit: 'тг/м³',
+    cvUnit: 'Гкал/тыс. м³',
+    defaultCV: 8.19,
+    defaultTariff: 49.90,
+  },
+  electricity: {
+    label: 'Электрическая энергия',
+    fuelUnit: 'тыс. кВт·ч',
+    tariffUnit: 'тг/кВт·ч',
+    cvUnit: 'Гкал/тыс. кВт·ч',
+    defaultCV: 0.8604,
+    defaultTariff: 25.00,
+  },
+  coal: {
+    label: 'Каменный уголь',
+    fuelUnit: 'тонн',
+    tariffUnit: 'тг/тонна',
+    cvUnit: 'Гкал/тонна',
+    defaultCV: 5.4,
+    defaultTariff: 18000,
+  },
+  diesel: {
+    label: 'Дизельное топливо',
+    fuelUnit: 'тонн',
+    tariffUnit: 'тг/тонна',
+    cvUnit: 'Гкал/тонна',
+    defaultCV: 10.1,
+    defaultTariff: 280000,
+  },
 }
 
 export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceChange }: Props) {
@@ -21,6 +73,18 @@ export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceCha
     onFinanceChange({ ...finance, [key]: value })
   }
 
+  function changeFuelType(newType: FuelType) {
+    const meta = FUEL_META[newType]
+    onSharedChange({
+      ...shared,
+      fuel_type: newType,
+      fuel_tariff: meta.defaultTariff,
+      fuel_calorific: meta.defaultCV,
+    })
+  }
+
+  const currentMeta = FUEL_META[shared.fuel_type]
+
   return (
     <section className="block">
       <header className="block__header">
@@ -28,47 +92,33 @@ export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceCha
       </header>
       <div className="grid">
         <label className="field">
-          <span>База расчёта тарифа</span>
+          <span>Источник теплоснабжения / вид топлива</span>
           <select
-            value={shared.tariff_type}
-            onChange={(e) => patchShared('tariff_type', e.target.value as 'gas' | 'gcal')}
+            value={shared.fuel_type}
+            onChange={(e) => changeFuelType(e.target.value as FuelType)}
           >
-            <option value="gcal">Тепловая энергия (тг/Гкал)</option>
-            <option value="gas">Природный газ (тг/м³)</option>
+            {(Object.keys(FUEL_META) as FuelType[]).map((type) => (
+              <option key={type} value={type}>
+                {FUEL_META[type].label}
+              </option>
+            ))}
           </select>
         </label>
 
-        {shared.tariff_type === 'gas' ? (
-          <>
-            <Field
-              label="Тариф на газ (тг/м³)"
-              value={shared.tariff_tg_per_m3}
-              onChange={(v) => patchShared('tariff_tg_per_m3', v)}
-              step={0.01}
-            />
-            <Field
-              label="Теплотворная способность газа, Гкал/тыс.м³"
-              value={shared.gas_calorific_gcal_per_thousand_m3}
-              onChange={(v) => patchShared('gas_calorific_gcal_per_thousand_m3', v)}
-              step={0.01}
-            />
-          </>
-        ) : (
-          <>
-            <Field
-              label="Тариф на тепловую энергию (тг/Гкал)"
-              value={shared.tariff_tg_per_gcal}
-              onChange={(v) => patchShared('tariff_tg_per_gcal', v)}
-              step={0.01}
-            />
-            {/* Мы всё еще можем показать теплотворность для перевода в газ */}
-            <Field
-              label="Теплотворная способность газа, Гкал/тыс.м³"
-              value={shared.gas_calorific_gcal_per_thousand_m3}
-              onChange={(v) => patchShared('gas_calorific_gcal_per_thousand_m3', v)}
-              step={0.01}
-            />
-          </>
+        <Field
+          label={`Тариф на теплоснабжение (${currentMeta.tariffUnit})`}
+          value={shared.fuel_tariff}
+          onChange={(v) => patchShared('fuel_tariff', v)}
+          step={0.01}
+        />
+
+        {shared.fuel_type !== 'gcal' && (
+          <Field
+            label={`Теплотворная способность (${currentMeta.cvUnit})`}
+            value={shared.fuel_calorific}
+            onChange={(v) => patchShared('fuel_calorific', v)}
+            step={0.0001}
+          />
         )}
 
         <Field

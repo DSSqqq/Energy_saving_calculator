@@ -1,13 +1,6 @@
 """
 Сборка раздела отчёта по мероприятию «Стены» в формате .docx.
-
-Структура:
-  1. Таблица — площадь наружных стен по зданиям.
-  2. Исходные данные.
-  3. Расчёт теплопотерь по каждому зданию.
-  4. Итоги, перевод в газ, экономия в тг, инвестиции.
-  5. Финансовые показатели проекта (NPV, IRR, DPI, PBP).
-  6. Диаграмма NPV.
+Поддерживает множественные виды топлива.
 """
 from __future__ import annotations
 
@@ -36,6 +29,13 @@ from ..docx_utils.number_fmt import (
 # Попробуем использовать тот же базовый шаблон что и для окон, если есть
 _WINDOWS_BASE = Path(__file__).parent.parent / "windows" / "template" / "base.docx"
 
+FUEL_META = {
+    "gas": {"label": "Природный газ", "fuel_unit": "тыс. м³", "tariff_unit": "тг/м³", "cv_unit": "Гкал/тыс. м³"},
+    "electricity": {"label": "Электрическая энергия", "fuel_unit": "тыс. кВт·ч", "tariff_unit": "тг/кВт·ч", "cv_unit": "Гкал/тыс. кВт·ч"},
+    "coal": {"label": "Каменный уголь", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна"},
+    "diesel": {"label": "Дизельное топливо", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна"},
+    "gcal": {"label": "Центральное теплоснабжение", "fuel_unit": "Гкал", "tariff_unit": "тг/Гкал", "cv_unit": "Гкал/Гкал"},
+}
 
 def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     """Сборка документа по стенам."""
@@ -50,6 +50,9 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     invest = results["investment"]
     fin = results["finance"]
     buildings = results["buildings"]
+
+    fuel_type = shared.get("fuel_type", "gcal")
+    meta = FUEL_META.get(fuel_type, FUEL_META["gcal"])
 
     add_heading_para(doc, "Улучшение теплозащитных свойств наружных стен")
 
@@ -72,18 +75,21 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     tbl2 = make_audit_table(doc, [
         "Параметр", "Значение", "Единица"
     ])
-    tariff_type = shared.get("tariff_type", "gcal")
-    if tariff_type == "gas":
-        tariff_row = ("Тариф на газ", fmt_num(shared["tariff_tg_per_m3"]), "тг/м³")
-    else:
-        tariff_row = ("Тариф на тепловую энергию", fmt_num(shared["tariff_tg_per_gcal"]), "тг/Гкал")
-
+    
     rows2 = [
-        ("Теплотворная способность газа", fmt_num(shared["gas_calorific_gcal_per_thousand_m3"]), "Гкал/тыс. м³"),
-        tariff_row,
+        (f"Вид топлива / теплоснабжения", meta["label"], ""),
+        (f"Тариф на энергоноситель", fmt_num(shared["fuel_tariff"]), meta["tariff_unit"]),
+    ]
+    if fuel_type != "gcal":
+        rows2.append(
+            (f"Теплотворная способность", fmt_num(shared["fuel_calorific"]), meta["cv_unit"])
+        )
+    
+    rows2.extend([
         ("Ставка дисконтирования", fmt_percent(finance_params["discount_rate"]), ""),
         ("Горизонт расчёта NPV", str(finance_params["horizon_years"]), "лет"),
-    ]
+    ])
+    
     for param, val, unit in rows2:
         r = tbl2.add_row().cells
         r[0].text = param
@@ -135,7 +141,7 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     )
     add_body_paragraph(
         doc,
-        f"Экономия природного газа: {fmt_num(totals['gas_thousand_m3'], 3)} тыс. м³/год"
+        f"Экономия энергоносителя ({meta['label']}): {fmt_num(totals['fuel_savings'], 3)} {totals['fuel_unit']}/год"
     )
     add_body_paragraph(
         doc,
