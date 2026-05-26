@@ -28,12 +28,12 @@ export function HomePage({ onSelectView }: Props) {
 
         <div className="bento-card bento-card--yellow">
           <div className="bento-card__icon">👤</div>
-          <div className="bento-card__title">Кадры</div>
+          <div className="bento-card__title">Мой профиль</div>
         </div>
 
         <div className="bento-card bento-card--green">
           <div className="bento-card__icon">📈</div>
-          <div className="bento-card__title">Годовой<br/>отчет</div>
+          <div className="bento-card__title">Выполненный<br/>объем работ</div>
         </div>
 
         <div className="bento-card bento-card--pink">

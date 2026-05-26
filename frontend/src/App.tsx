@@ -5,21 +5,23 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { WindowsMeasure } from './measures/windows/WindowsMeasure'
+import { WallsMeasure } from './measures/walls/WallsMeasure'
 import { TemplatesPage } from './TemplatesPage'
 import { HomePage } from './HomePage'
 import { TasksPage } from './TasksPage'
 
 function App() {
   // Helper to determine initial view based on URL hash
-  const getInitialView = (): 'home' | 'templates' | 'windows' | 'tasks' => {
+  const getInitialView = (): 'home' | 'templates' | 'windows' | 'walls' | 'tasks' => {
     const hash = window.location.hash
     if (hash === '#/templates') return 'templates'
     if (hash === '#/windows') return 'windows'
+    if (hash === '#/walls') return 'walls'
     if (hash === '#/tasks') return 'tasks'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'tasks'>(getInitialView)
+  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'walls' | 'tasks'>(getInitialView)
 
   // Update hash when currentView changes
   useEffect(() => {
@@ -29,6 +31,8 @@ function App() {
       targetHash = '#/templates'
     } else if (currentView === 'windows') {
       targetHash = '#/windows'
+    } else if (currentView === 'walls') {
+      targetHash = '#/walls'
     } else if (currentView === 'tasks') {
       targetHash = '#/tasks'
     }
@@ -46,6 +50,8 @@ function App() {
         setCurrentView('templates')
       } else if (hash === '#/windows') {
         setCurrentView('windows')
+      } else if (hash === '#/walls') {
+        setCurrentView('walls')
       } else if (hash === '#/tasks') {
         setCurrentView('tasks')
       } else {
@@ -102,6 +108,8 @@ function App() {
         <TemplatesPage onSelectMeasure={setCurrentView} />
       ) : currentView === 'windows' ? (
         <WindowsMeasure />
+      ) : currentView === 'walls' ? (
+        <WallsMeasure />
       ) : currentView === 'tasks' ? (
         <TasksPage />
       ) : null}

@@ -10,3 +10,4 @@ class MeasuresConfig(AppConfig):
         # Делаем это в ready, чтобы не было циклических импортов при загрузке settings.
         from . import registry  # noqa: F401
         from .windows import register as _register_windows  # noqa: F401
+        from .walls import register as _register_walls  # noqa: F401
