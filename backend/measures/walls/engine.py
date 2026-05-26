@@ -39,7 +39,7 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     shared = payload["shared"]
     finance = payload["finance"]
     a_gas = shared["gas_calorific_gcal_per_thousand_m3"]
-    tariff = shared["tariff_tg_per_m3"]
+    tariff_type = shared.get("tariff_type", "gcal")
 
     buildings_out: List[Dict[str, Any]] = []
     total_area = 0.0
@@ -79,7 +79,11 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     gas_thousand_m3 = total_q_gcal / a_gas if a_gas else 0.0
-    money_savings_tg = gas_thousand_m3 * 1000.0 * tariff
+    
+    if tariff_type == "gas":
+        money_savings_tg = gas_thousand_m3 * 1000.0 * shared["tariff_tg_per_m3"]
+    else:  # "gcal"
+        money_savings_tg = total_q_gcal * shared["tariff_tg_per_gcal"]
 
     # Денежная экономия по зданиям пропорционально доле энергии.
     for row in buildings_out:

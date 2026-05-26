@@ -43,6 +43,13 @@ class SharedParamsSerializer(serializers.Serializer):
     tariff_tg_per_m3 = serializers.FloatField(
         default=49.90, help_text="Тариф (тенге за 1 м³ природного газа)"
     )
+    tariff_tg_per_gcal = serializers.FloatField(
+        default=6761.45, help_text="Тариф (тенге за 1 Гкал тепловой энергии)"
+    )
+    tariff_type = serializers.ChoiceField(
+        choices=[("gas", "Природный газ"), ("gcal", "Тепловая энергия")],
+        default="gcal"
+    )
 
 
 class InvestmentItemSerializer(serializers.Serializer):

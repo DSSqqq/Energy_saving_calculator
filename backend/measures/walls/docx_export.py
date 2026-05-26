@@ -72,9 +72,15 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
     tbl2 = make_audit_table(doc, [
         "Параметр", "Значение", "Единица"
     ])
+    tariff_type = shared.get("tariff_type", "gcal")
+    if tariff_type == "gas":
+        tariff_row = ("Тариф на газ", fmt_num(shared["tariff_tg_per_m3"]), "тг/м³")
+    else:
+        tariff_row = ("Тариф на тепловую энергию", fmt_num(shared["tariff_tg_per_gcal"]), "тг/Гкал")
+
     rows2 = [
         ("Теплотворная способность газа", fmt_num(shared["gas_calorific_gcal_per_thousand_m3"]), "Гкал/тыс. м³"),
-        ("Тариф на газ", fmt_num(shared["tariff_tg_per_m3"]), "тг/м³"),
+        tariff_row,
         ("Ставка дисконтирования", fmt_percent(finance_params["discount_rate"]), ""),
         ("Горизонт расчёта NPV", str(finance_params["horizon_years"]), "лет"),
     ]

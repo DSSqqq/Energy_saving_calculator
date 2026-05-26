@@ -1,6 +1,7 @@
 /**
  * Форма общих параметров для мероприятия «Стены».
  * Отличие от «Окна»: нет c_air, k_factor (инфильтрация не используется).
+ * Добавлен выбор базы расчёта тарифа (природный газ или тепловая энергия).
  */
 import type { SharedParams, FinanceParams } from './types'
 
@@ -12,33 +13,68 @@ type Props = {
 }
 
 export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceChange }: Props) {
-  function patch<T extends object>(prev: T, key: keyof T, value: number): T {
-    return { ...prev, [key]: value }
+  function patchShared<K extends keyof SharedParams>(key: K, value: SharedParams[K]) {
+    onSharedChange({ ...shared, [key]: value })
   }
+
+  function patchFinance<K extends keyof FinanceParams>(key: K, value: FinanceParams[K]) {
+    onFinanceChange({ ...finance, [key]: value })
+  }
+
   return (
     <section className="block">
       <header className="block__header">
         <h2><span className="title-icon">⚙️</span>Общие параметры расчёта</h2>
       </header>
       <div className="grid">
-        <Field
-          label="Теплотворная способность газа, Гкал/тыс.м³"
-          value={shared.gas_calorific_gcal_per_thousand_m3}
-          onChange={(v) =>
-            onSharedChange(patch(shared, 'gas_calorific_gcal_per_thousand_m3', v))
-          }
-          step={0.01}
-        />
-        <Field
-          label="Тариф (тг/м³ газа)"
-          value={shared.tariff_tg_per_m3}
-          onChange={(v) => onSharedChange(patch(shared, 'tariff_tg_per_m3', v))}
-          step={0.01}
-        />
+        <label className="field">
+          <span>База расчёта тарифа</span>
+          <select
+            value={shared.tariff_type}
+            onChange={(e) => patchShared('tariff_type', e.target.value as 'gas' | 'gcal')}
+          >
+            <option value="gcal">Тепловая энергия (тг/Гкал)</option>
+            <option value="gas">Природный газ (тг/м³)</option>
+          </select>
+        </label>
+
+        {shared.tariff_type === 'gas' ? (
+          <>
+            <Field
+              label="Тариф на газ (тг/м³)"
+              value={shared.tariff_tg_per_m3}
+              onChange={(v) => patchShared('tariff_tg_per_m3', v)}
+              step={0.01}
+            />
+            <Field
+              label="Теплотворная способность газа, Гкал/тыс.м³"
+              value={shared.gas_calorific_gcal_per_thousand_m3}
+              onChange={(v) => patchShared('gas_calorific_gcal_per_thousand_m3', v)}
+              step={0.01}
+            />
+          </>
+        ) : (
+          <>
+            <Field
+              label="Тариф на тепловую энергию (тг/Гкал)"
+              value={shared.tariff_tg_per_gcal}
+              onChange={(v) => patchShared('tariff_tg_per_gcal', v)}
+              step={0.01}
+            />
+            {/* Мы всё еще можем показать теплотворность для перевода в газ */}
+            <Field
+              label="Теплотворная способность газа, Гкал/тыс.м³"
+              value={shared.gas_calorific_gcal_per_thousand_m3}
+              onChange={(v) => patchShared('gas_calorific_gcal_per_thousand_m3', v)}
+              step={0.01}
+            />
+          </>
+        )}
+
         <Field
           label="Ставка дисконтирования (доля, не %)"
           value={finance.discount_rate}
-          onChange={(v) => onFinanceChange(patch(finance, 'discount_rate', v))}
+          onChange={(v) => patchFinance('discount_rate', v)}
           step={0.01}
           min={0}
           max={1}
@@ -46,7 +82,7 @@ export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceCha
         <Field
           label="Горизонт NPV, лет"
           value={finance.horizon_years}
-          onChange={(v) => onFinanceChange(patch(finance, 'horizon_years', v))}
+          onChange={(v) => patchFinance('horizon_years', v)}
           step={1}
           min={1}
           max={50}

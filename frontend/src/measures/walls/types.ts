@@ -35,6 +35,8 @@ export type Building = {
 export type SharedParams = {
   gas_calorific_gcal_per_thousand_m3: number
   tariff_tg_per_m3: number
+  tariff_tg_per_gcal: number
+  tariff_type: 'gas' | 'gcal'
 }
 
 export type InvestmentItem = {

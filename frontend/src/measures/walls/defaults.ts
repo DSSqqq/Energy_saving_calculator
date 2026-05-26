@@ -33,6 +33,8 @@ const buildingFactory: Building = {
 const sharedDefaults: SharedParams = {
   gas_calorific_gcal_per_thousand_m3: 8.19,
   tariff_tg_per_m3: 49.9,
+  tariff_tg_per_gcal: 6761.45,
+  tariff_type: 'gcal',
 }
 
 const investmentDefaults: InvestmentItem[] = [
