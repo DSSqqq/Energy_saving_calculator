@@ -1,6 +1,6 @@
 """
 Сборка раздела отчёта по мероприятию «Стены» в формате .docx.
-Поддерживает множественные виды топлива.
+Логика разметки и стилей полностью совпадает с мероприятием «Окна».
 """
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 from docx import Document
-from docx.shared import Pt
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.shared import Inches, Pt, Cm
+from docx.enum.section import WD_SECTION, WD_ORIENT
 
 from ..docx_utils.builder import (
     add_body_paragraph,
@@ -25,175 +27,453 @@ from ..docx_utils.number_fmt import (
     fmt_percent,
     fmt_years,
 )
+from ..windows import equations as eq
 
-# Попробуем использовать тот же базовый шаблон что и для окон, если есть
-_WINDOWS_BASE = Path(__file__).parent.parent / "windows" / "template" / "base.docx"
+BASE_DOCX_PATH = Path(__file__).parent.parent / "windows" / "template" / "base.docx"
 
 FUEL_META = {
-    "gas": {"label": "Природный газ", "fuel_unit": "тыс. м³", "tariff_unit": "тг/м³", "cv_unit": "Гкал/тыс. м³"},
-    "electricity": {"label": "Электрическая энергия", "fuel_unit": "тыс. кВт·ч", "tariff_unit": "тг/кВт·ч", "cv_unit": "Гкал/тыс. кВт·ч"},
-    "coal": {"label": "Каменный уголь", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна"},
-    "diesel": {"label": "Дизельное топливо", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна"},
-    "gcal": {"label": "Центральное теплоснабжение", "fuel_unit": "Гкал", "tariff_unit": "тг/Гкал", "cv_unit": "Гкал/Гкал"},
+    "gas": {"label": "природного газа", "label_nom": "Природный газ", "label_short": "газа", "fuel_unit": "тыс. м³", "tariff_unit": "тг/м³", "cv_unit": "Гкал/тыс. м³", "multiplier": "1000"},
+    "electricity": {"label": "электрической энергии", "label_nom": "Электрическая энергия", "label_short": "электр.", "fuel_unit": "тыс. кВт·ч", "tariff_unit": "тг/кВт·ч", "cv_unit": "Гкал/тыс. кВт·ч", "multiplier": "1000"},
+    "coal": {"label": "каменного угля", "label_nom": "Каменный уголь", "label_short": "угля", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна", "multiplier": "1"},
+    "diesel": {"label": "дизельного топлива", "label_nom": "Дизельное топливо", "label_short": "диз.", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна", "multiplier": "1"},
+    "gcal": {"label": "тепловой энергии", "label_nom": "Центральное теплоснабжение", "label_short": "тепла", "fuel_unit": "Гкал", "tariff_unit": "тг/Гкал", "cv_unit": "Гкал/Гкал", "multiplier": "1"},
 }
 
+_INTRO_AFTER_TABLE_1 = (
+    "Анализ наружных стен выявил высокий потенциал сбережения тепловой энергии за счет "
+    "повышения их теплозащитных свойств (утепления). Предлагается выполнить комплексные "
+    "работы по монтажу теплоизоляционного слоя на внешние фасады сооружений."
+)
+_INTRO_BEFORE_INPUTS = (
+    "Ниже представлен детальный расчёт сбережения тепловой энергии. Внедрение теплоизоляции "
+    "позволяет существенно снизить коэффициент теплопередачи наружных стен и повысить их термическое "
+    "сопротивление, тем самым сокращая трансмиссионные потери теплоты."
+)
+
+
 def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
-    """Сборка документа по стенам."""
-    if _WINDOWS_BASE.exists():
-        doc = Document(str(_WINDOWS_BASE))
+    """Сборка документа программно из base.docx (стили + размеры страницы)."""
+    if BASE_DOCX_PATH.exists():
+        doc = Document(str(BASE_DOCX_PATH))
     else:
         doc = Document()
+        _apply_fallback_styles(doc)
 
-    shared = payload["shared"]
-    finance_params = payload["finance"]
+    add_heading_para(doc, "3.3.7 Улучшение теплозащитных свойств наружных стен")
+
+    _section_table_1(doc, results)
+    add_body_paragraph(doc, _INTRO_AFTER_TABLE_1)
+    add_body_paragraph(doc, _INTRO_BEFORE_INPUTS)
+
+    if results["buildings"]:
+        first_building = results["buildings"][0]
+        _section_per_building_transmission(doc, first_building)
+        
+        if len(results["buildings"]) > 1:
+            add_body_paragraph(doc, "Алгоритм расчета для остальных сооружений идентичен вышеописанному (см. таблицу 3.3.7.3).")
+            doc.add_paragraph()
+
+    _section_totals(doc, payload, results)
+    _section_table_3(doc, results)
+    _section_table_4(doc, results)
+    _section_table_finance(doc, results)
+    _section_chart(doc, results)
+
+    out = io.BytesIO()
+    doc.save(out)
+    return out.getvalue()
+
+
+# --- Helpers ------------------------------------------------------------------
+
+def _apply_fallback_styles(doc: Document) -> None:
+    normal = doc.styles["Normal"]
+    normal.font.name = "Times New Roman"
+    normal.font.size = Pt(12)
+
+    pf = normal.paragraph_format
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(0)
+    pf.line_spacing = 1.0
+
+
+def _add_equation(doc, omml_element) -> None:
+    """Вставляет готовый OMML-абзац в документ и центрирует его."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    
+    p = doc.add_paragraph()
+    p.paragraph_format.first_line_indent = Pt(0)
+    p.paragraph_format.left_indent = Pt(0)
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after = Pt(6)
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+
+    m_pr = omml_element.find(qn('m:oMathParaPr'))
+    if m_pr is None:
+        m_pr = OxmlElement('m:oMathParaPr')
+        omml_element.insert(0, m_pr)
+    m_jc = m_pr.find(qn('m:jc'))
+    if m_jc is None:
+        m_jc = OxmlElement('m:jc')
+        m_pr.append(m_jc)
+    m_jc.set(qn('m:val'), 'centerGroup')
+
+    p._p.append(omml_element)
+
+
+def _bullet_paragraph(doc, text: str) -> None:
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.left_indent = Cm(1.89)
+    p.paragraph_format.first_line_indent = Cm(-0.63)
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.space_before = Pt(0)
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+    
+    run = p.add_run(text)
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(12)
+
+
+def _bullet_rich(doc, *segments) -> None:
+    from docx.oxml.ns import qn as _qn
+    from docx.oxml import OxmlElement
+
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.left_indent = Cm(1.89)
+    p.paragraph_format.first_line_indent = Cm(-0.63)
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.space_before = Pt(0)
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+
+    def _add_run(text, subscript=False):
+        run = p.add_run(text)
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(12)
+        if subscript:
+            rpr = run._element.get_or_add_rPr()
+            va = OxmlElement("w:vertAlign")
+            va.set(_qn("w:val"), "subscript")
+            rpr.append(va)
+
+    for seg in segments:
+        if isinstance(seg, str):
+            _add_run(seg)
+        elif isinstance(seg, tuple) and len(seg) == 2:
+            base, sub = seg
+            _add_run(base)
+            _add_run(sub, subscript=True)
+        else:
+            _add_run(str(seg))
+
+
+# --- Sections -----------------------------------------------------------------
+
+def _section_table_1(doc, results: Dict[str, Any]) -> None:
+    landscape_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    landscape_section.orientation = WD_ORIENT.LANDSCAPE
+    new_width, new_height = landscape_section.page_height, landscape_section.page_width
+    landscape_section.page_width = new_width
+    landscape_section.page_height = new_height
+
+    p_cap = doc.add_paragraph()
+    p_cap.paragraph_format.first_line_indent = None
+    p_cap.paragraph_format.space_before = Pt(6)
+    p_cap.paragraph_format.space_after = Pt(0)
+    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+    
+    add_runs_with_highlight(p_cap, "Таблица 3.3.7.1 - Исходные данные по зданиям", italic=True)
+
+    rows = []
+    for b in results["buildings"]:
+        rows.append((
+            b["name"],
+            fmt_num(b["area_m2"], 2),
+            fmt_num(b["r_before"], 2),
+            fmt_num(b["r_after"], 2),
+            fmt_num(b["period_days"], 0),
+            fmt_num(b["t_inside"], 1),
+            fmt_num(b["t_outside_avg"], 1),
+        ))
+    
+    rows.append((
+        "ИТОГО",
+        fmt_num(results["totals"]["area_m2"], 2),
+        "-", "-", "-", "-", "-"
+    ))
+    
+    headers = [
+        "Наименование здания",
+        "Площадь наружных стен, м²",
+        "Термическое сопротивление до, м²·°С/Вт",
+        "Термическое сопротивление после, м²·°С/Вт",
+        "Продолжительность отопительного периода, сут.",
+        "Температура внутри помещения, °С",
+        "Средняя температура наружного воздуха за отопительный период, °С"
+    ]
+    
+    make_audit_table(
+        doc,
+        headers,
+        rows,
+        numeric_columns=[1, 2, 3, 4, 5, 6],
+        col_widths=[Cm(4), Cm(3), Cm(4), Cm(4), Cm(3), Cm(3), Cm(4)]
+    )
+    doc.add_paragraph()
+    
+    portrait_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    portrait_section.orientation = WD_ORIENT.PORTRAIT
+    p_width, p_height = portrait_section.page_height, portrait_section.page_width
+    portrait_section.page_width = p_width
+    portrait_section.page_height = p_height
+
+
+def _section_per_building_transmission(doc, b: Dict[str, Any]) -> None:
+    add_body_paragraph(
+        doc,
+        f"Ниже представлен расчёт трансмиссионных теплопотерь через наружные стены для здания {b['name']}.",
+    )
+    add_body_paragraph(doc, "Исходные данные:", first_line_indent=False)
+    _bullet_paragraph(doc, f"Площадь наружных стен: S = {fmt_num(b['area_m2'], 2)} м²")
+    _bullet_rich(doc, "Средняя наружная температура: ", ("t", "н"), f" = {fmt_num(b['t_outside_avg'], 1)} °С")
+    _bullet_rich(doc, "Внутренняя температура: ", ("t", "в"), f" = {fmt_num(b['t_inside'], 1)} °С")
+    _bullet_paragraph(doc, f"Продолжительность отопительного периода: z = {fmt_num(b['period_days'], 0)} сут.")
+    _bullet_rich(doc, "Сопротивление теплопередаче до утепления: ", ("R", "до"), f" = {fmt_num(b['r_before'], 2)} м²·°С/Вт")
+    _bullet_rich(doc, "Сопротивление теплопередаче после утепления: ", ("R", "после"), f" = {fmt_num(b['r_after'], 2)} м²·°С/Вт")
+    
+    add_body_paragraph(doc, "Теплопотери до мероприятия:")
+    doc.add_paragraph()
+    _add_equation(
+        doc,
+        eq.eq_q_kwh(
+            subscript="1",
+            r_subscript="до",
+            area=fmt_num(b["area_m2"], 2),
+            r_val=fmt_num(b["r_before"], 2),
+            t_in=fmt_num(b["t_inside"], 1),
+            t_out_avg=fmt_num(b["t_outside_avg"], 1),
+            period_days=fmt_num(b["period_days"], 0),
+            result_kwh=fmt_num(b["q1_kwh"], 1),
+        ),
+    )
+    doc.add_paragraph()
+
+    add_body_paragraph(doc, "Теплопотери после мероприятия:")
+    doc.add_paragraph()
+    _add_equation(
+        doc,
+        eq.eq_q_kwh(
+            subscript="2",
+            r_subscript="после",
+            area=fmt_num(b["area_m2"], 2),
+            r_val=fmt_num(b["r_after"], 2),
+            t_in=fmt_num(b["t_inside"], 1),
+            t_out_avg=fmt_num(b["t_outside_avg"], 1),
+            period_days=fmt_num(b["period_days"], 0),
+            result_kwh=fmt_num(b["q2_kwh"], 1),
+        ),
+    )
+    doc.add_paragraph()
+
+    add_body_paragraph(doc, "Экономия тепловой энергии, Гкал:")
+    doc.add_paragraph()
+    _add_equation(
+        doc,
+        eq.eq_delta_q(
+            q1=fmt_num(b["q1_kwh"], 1),
+            q2=fmt_num(b["q2_kwh"], 1),
+            result_gcal=fmt_num(b["q_transmission_gcal"], 2),
+        ),
+    )
+    doc.add_paragraph()
+
+
+def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> None:
     totals = results["totals"]
-    invest = results["investment"]
-    fin = results["finance"]
-    buildings = results["buildings"]
+    shared = payload["shared"]
+    add_body_paragraph(doc, f"ИТОГО: ΣQ = {fmt_num(totals['q_total_gcal'], 2)} Гкал", first_line_indent=False)
 
     fuel_type = shared.get("fuel_type", "gcal")
     meta = FUEL_META.get(fuel_type, FUEL_META["gcal"])
 
-    add_heading_para(doc, "Улучшение теплозащитных свойств наружных стен")
-
-    # --- Таблица 1: площадь стен по зданиям ---
-    add_caption(doc, "Таблица — Площадь наружных стен по зданиям")
-    tbl1 = make_audit_table(doc, ["№", "Наименование здания", "Площадь стен, м²"])
-    for i, b in enumerate(buildings, 1):
-        row = tbl1.add_row().cells
-        row[0].text = str(i)
-        row[1].text = b["name"]
-        row[2].text = fmt_num(b["area_m2"])
-    total_row = tbl1.add_row().cells
-    total_row[0].text = ""
-    total_row[1].text = "ИТОГО"
-    total_row[2].text = fmt_num(totals["area_m2"])
-
-    # --- Исходные данные ---
-    add_heading_para(doc, "Исходные данные расчёта", level=2)
-    add_caption(doc, "Таблица — Исходные данные")
-    tbl2 = make_audit_table(doc, [
-        "Параметр", "Значение", "Единица"
-    ])
-    
-    rows2 = [
-        (f"Вид топлива / теплоснабжения", meta["label"], ""),
-        (f"Тариф на энергоноситель", fmt_num(shared["fuel_tariff"]), meta["tariff_unit"]),
-    ]
     if fuel_type != "gcal":
-        rows2.append(
-            (f"Теплотворная способность", fmt_num(shared["fuel_calorific"]), meta["cv_unit"])
+        add_body_paragraph(
+            doc,
+            f"Перевод потребленных Гкал в объем {meta['label']} ({meta['fuel_unit']}); удельная теплота сгорания принята за "
+            f"{fmt_num(shared['fuel_calorific'], 4)} {meta['cv_unit']}:",
         )
+        doc.add_paragraph()
+        _add_equation(
+            doc,
+            eq.eq_fuel_savings(
+                label=meta["label_short"],
+                sum_q=fmt_num(totals["q_total_gcal"], 2),
+                calorific=fmt_num(shared["fuel_calorific"], 4),
+                result=fmt_num(totals["fuel_savings"], 3),
+                unit=meta["fuel_unit"],
+            ),
+        )
+        doc.add_paragraph()
+
+    add_body_paragraph(doc, "Экономия тепловой энергии в денежном выражении, тг:")
+    doc.add_paragraph()
+
+    if fuel_type != "gcal":
+        _add_equation(
+            doc,
+            eq.eq_money_savings(
+                fuel_val=fmt_num(totals["fuel_savings"], 3),
+                tariff=fmt_num(shared["fuel_tariff"], 2),
+                multiplier=meta["multiplier"],
+                result=fmt_money(totals["money_savings_tg"]),
+            ),
+        )
+        doc.add_paragraph()
+        add_body_paragraph(
+            doc,
+            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} {meta['tariff_unit']} — средняя цена {meta['label']}.",
+        )
+    else:
+        _add_equation(
+            doc,
+            eq.eq_money_savings(
+                fuel_val=fmt_num(totals["q_total_gcal"], 2),
+                tariff=fmt_num(shared["fuel_tariff"], 2),
+                multiplier="1",
+                result=fmt_money(totals["money_savings_tg"]),
+            ),
+        )
+        doc.add_paragraph()
+        add_body_paragraph(
+            doc,
+            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} тг/Гкал — средняя цена тепловой энергии.",
+        )
+
+    invest = results["investment"]
+    add_body_paragraph(doc, "Стоимость затрат на внедрение мероприятия, тг:")
+    add_body_paragraph(
+        doc,
+        f"I = {fmt_money(invest['total_tg'])} тг (см. таблицу 3.3.7.2).",
+        first_line_indent=False,
+    )
+    add_body_paragraph(doc, "Простой срок окупаемости мероприятия, год:")
+    doc.add_paragraph()
+    _add_equation(
+        doc,
+        eq.eq_pbp(
+            investment=fmt_money(invest["total_tg"]),
+            money=fmt_money(totals["money_savings_tg"]),
+            result=fmt_years(results["finance"]["pbp_years"]),
+        ),
+    )
+    doc.add_page_break()
+
+
+def _section_table_3(doc, results: Dict[str, Any]) -> None:
+    doc.add_paragraph()
+    p_cap = doc.add_paragraph()
+    p_cap.paragraph_format.first_line_indent = None
+    p_cap.paragraph_format.space_before = Pt(6)
+    p_cap.paragraph_format.space_after = Pt(0)
+    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    rows2.extend([
-        ("Ставка дисконтирования", fmt_percent(finance_params["discount_rate"]), ""),
-        ("Горизонт расчёта NPV", str(finance_params["horizon_years"]), "лет"),
-    ])
+    add_runs_with_highlight(p_cap, "Таблица 3.3.7.2 - Смета на утепление наружных стен", italic=True)
+
+    rows = []
+    for item in results["investment"]["items"]:
+        rows.append(
+            (
+                item["name"],
+                fmt_num(item["quantity"], 2),
+                fmt_num(item["price_per_unit"], 2),
+                fmt_money(item["cost_tg"]),
+            )
+        )
+    rows.append(("Итого", "—", "—", fmt_money(results['investment']['total_tg'])))
+    make_audit_table(
+        doc,
+        ["Наименование материалов/работ", "Количество, м²", "Цена за ед., тг", "Стоимость, тг"],
+        rows,
+        numeric_columns=[1, 2, 3], col_widths=[Cm(6), Cm(3), Cm(4), Cm(4)]
+    )
+    doc.add_paragraph()
+
+
+def _section_table_4(doc, results: Dict[str, Any]) -> None:
+    p_cap = doc.add_paragraph()
+    p_cap.paragraph_format.first_line_indent = None
+    p_cap.paragraph_format.space_before = Pt(6)
+    p_cap.paragraph_format.space_after = Pt(0)
+    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     
-    for param, val, unit in rows2:
-        r = tbl2.add_row().cells
-        r[0].text = param
-        r[1].text = val
-        r[2].text = unit
+    add_runs_with_highlight(p_cap, "Таблица 3.3.7.3 – Сводная экономия по зданиям", italic=True)
 
-    # --- Расчёт по каждому зданию ---
-    add_heading_para(doc, "Расчёт экономии тепловой энергии", level=2)
-    for b in buildings:
-        add_body_paragraph(doc, f"Здание: {b['name']}")
-        add_body_paragraph(
-            doc,
-            f"  ΔT = t_внутр − t_нар = {fmt_num(b['t_inside'])} − ({fmt_num(b['t_outside_avg'])}) = {fmt_num(b['delta_t'])} °C"
+    rows = []
+    for b in results["buildings"]:
+        rows.append(
+            (
+                b["name"],
+                fmt_num(b["q_total_gcal"], 2),
+                fmt_money(b["money_savings_tg"]),
+            )
         )
-        add_body_paragraph(
-            doc,
-            f"  Q_до   = {fmt_num(b['area_m2'])} / {fmt_num(b['r_before'])} × {fmt_num(b['delta_t'])} × 0.001 × {fmt_num(b['period_days'])} × 24 = {fmt_num(b['q1_kwh'])} кВт·ч/год"
-        )
-        add_body_paragraph(
-            doc,
-            f"  Q_после = {fmt_num(b['area_m2'])} / {fmt_num(b['r_after'])} × {fmt_num(b['delta_t'])} × 0.001 × {fmt_num(b['period_days'])} × 24 = {fmt_num(b['q2_kwh'])} кВт·ч/год"
-        )
-        add_body_paragraph(
-            doc,
-            f"  ΔQ = ({fmt_num(b['q1_kwh'])} − {fmt_num(b['q2_kwh'])}) × 860.421 / 1 000 000 = {fmt_num(b['q_transmission_gcal'])} Гкал/год"
-        )
-
-    # --- Итоги ---
-    add_heading_para(doc, "Итоговые показатели", level=2)
-    add_caption(doc, "Таблица — Итоговая экономия по зданиям")
-    tbl3 = make_audit_table(doc, [
-        "Здание", "Площадь, м²", "ΔQ, Гкал/год", "Экономия, тг/год"
-    ])
-    for b in buildings:
-        r = tbl3.add_row().cells
-        r[0].text = b["name"]
-        r[1].text = fmt_num(b["area_m2"])
-        r[2].text = fmt_num(b["q_total_gcal"])
-        r[3].text = fmt_money(b["money_savings_tg"])
-    tr = tbl3.add_row().cells
-    tr[0].text = "ИТОГО"
-    tr[1].text = fmt_num(totals["area_m2"])
-    tr[2].text = fmt_num(totals["q_total_gcal"])
-    tr[3].text = fmt_money(totals["money_savings_tg"])
-
-    add_body_paragraph(
+    rows.append(("ИТОГО", fmt_num(results["totals"]["q_total_gcal"], 2), fmt_money(results["totals"]["money_savings_tg"])))
+    make_audit_table(
         doc,
-        f"Суммарная экономия тепловой энергии: {fmt_num(totals['q_total_gcal'])} Гкал/год"
+        ["Наименование объекта", "Суммарная экономия, Гкал", "Экономия, тг/год"],
+        rows,
+        numeric_columns=[1, 2], col_widths=[Cm(9), Cm(4), Cm(4)]
     )
-    add_body_paragraph(
-        doc,
-        f"Экономия энергоносителя ({meta['label']}): {fmt_num(totals['fuel_savings'], 3)} {totals['fuel_unit']}/год"
-    )
-    add_body_paragraph(
-        doc,
-        f"Денежная экономия: {fmt_money(totals['money_savings_tg'])} тг/год"
-    )
+    doc.add_paragraph()
 
-    # --- Инвестиции ---
-    if invest["items"]:
-        add_heading_para(doc, "Инвестиции", level=2)
-        add_caption(doc, "Таблица — Смета на утепление стен")
-        tbl4 = make_audit_table(doc, [
-            "Наименование работ/материалов", "Кол-во, м²", "Цена за ед., тг", "Стоимость, тг"
-        ])
-        for item in invest["items"]:
-            r = tbl4.add_row().cells
-            r[0].text = item["name"]
-            r[1].text = fmt_num(item["quantity"])
-            r[2].text = fmt_money(item["price_per_unit"])
-            r[3].text = fmt_money(item["cost_tg"])
-        ti = tbl4.add_row().cells
-        ti[0].text = "ИТОГО"
-        ti[1].text = ""
-        ti[2].text = ""
-        ti[3].text = fmt_money(invest["total_tg"])
 
-    # --- Финансовые показатели ---
-    add_heading_para(doc, "Финансовые показатели проекта", level=2)
-    add_caption(doc, "Таблица — Финансовые показатели")
-    tbl5 = make_audit_table(doc, ["Показатель", "Значение"])
-    fin_rows = [
-        ("Инвестиции", fmt_money(invest["total_tg"]) + " тг"),
-        ("Годовая экономия (денежный поток)", fmt_money(fin["annual_cash_flow_tg"]) + " тг/год"),
-        ("Простой срок окупаемости (PBP)", fmt_years(fin["pbp_years"])),
-        ("Дисконтированный срок окупаемости (DPBP)", fmt_years(fin["dpbp_years"])),
-        ("NPV", fmt_money(fin["npv_tg"]) + " тг"),
-        ("IRR", fmt_percent(fin["irr"]) if fin["irr"] is not None else "—"),
-        ("DPI", fmt_num(fin["dpi"])),
+def _section_table_finance(doc, results: Dict[str, Any]) -> None:
+    p_cap = doc.add_paragraph()
+    p_cap.paragraph_format.first_line_indent = None
+    p_cap.paragraph_format.space_before = Pt(6)
+    p_cap.paragraph_format.space_after = Pt(0)
+    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+    
+    add_runs_with_highlight(p_cap, "Таблица 3.3.7.4 - Показатели эффективности проекта", italic=True)
+
+    f = results["finance"]
+    rows = [
+        ("Ставка дисконтирования", "(%)", fmt_num(f["discount_rate"] * 100.0, 2)),
+        ("Первоначальные инвестиции", "тг", fmt_money(results["investment"]["total_tg"])),
+        ("Чистая приведённая стоимость (NPV)", "тг", fmt_money(f["npv_tg"])),
+        ("Дисконтированный индекс доходности (DPI)", "о.е.", fmt_num(f["dpi"], 2)),
+        (
+            "Внутренняя норма доходности (IRR)",
+            "(%)",
+            fmt_percent(f["irr"]) if f["irr"] is not None else "—",
+        ),
+        ("Простой срок окупаемости (PBP)", "лет", fmt_years(f["pbp_years"])),
+        ("Дисконтированный срок окупаемости (DPBP)", "год", fmt_years(f["dpbp_years"])),
     ]
-    for label, val in fin_rows:
-        r = tbl5.add_row().cells
-        r[0].text = label
-        r[1].text = val
+    make_audit_table(doc, ["Наименование", "Ед. изм-я", "Значение"], rows, 
+    numeric_columns=[2], col_widths=[Cm(11), Cm(3), Cm(3)])
 
-    # --- Диаграмма NPV ---
-    if fin.get("npv_by_year"):
-        try:
-            chart_bytes = render_npv_chart(fin["npv_by_year"])
-            chart_stream = io.BytesIO(chart_bytes)
-            doc.add_picture(chart_stream, width=Pt(400))
-        except Exception:
-            pass  # Если matplotlib недоступен — пропускаем
 
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+def _section_chart(doc, results: Dict[str, Any]) -> None:
+    new_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    new_section.orientation = WD_ORIENT.LANDSCAPE
+    new_width, new_height = new_section.page_height, new_section.page_width
+    new_section.page_width = new_width
+    new_section.page_height = new_height
+
+    png = render_npv_chart(results["finance"]["npv_by_year"])
+    
+    # Вставляем рисунок
+    p_img = doc.add_paragraph()
+    p_img.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    p_img.paragraph_format.space_before = Pt(12)
+    
+    img_stream = io.BytesIO(png)
+    p_img.add_run().add_picture(img_stream, width=Inches(9.0))
+    
+    p_cap = doc.add_paragraph()
+    p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    p_cap.paragraph_format.space_before = Pt(6)
+    p_cap.paragraph_format.space_after = Pt(12)
+    
+    add_runs_with_highlight(p_cap, "Рисунок 3.3.7.1 - Динамика изменения чистого дисконтированного дохода (NPV)", italic=True)
