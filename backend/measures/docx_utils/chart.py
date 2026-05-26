@@ -38,7 +38,6 @@ def render_npv_chart(series: List[dict]) -> bytes:
 
     # --- НОВЫЕ СТРОКИ: ПРИНУДИТЕЛЬНЫЙ ШАГ ДЛЯ ЦИФР ---
     ax.xaxis.set_major_locator(MultipleLocator(1))       # Цифры по оси X каждый 1 год
-    ax.yaxis.set_major_locator(MultipleLocator(100000))  # Цифры по оси Y каждые 100 000
     # -------------------------------------------------
 
     ax.grid(which="major", color="#999999", linestyle="-", linewidth=0.5)
