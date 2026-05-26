@@ -6,22 +6,26 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import { WindowsMeasure } from './measures/windows/WindowsMeasure'
 import { WallsMeasure } from './measures/walls/WallsMeasure'
+import { CurtainsMeasure } from './measures/curtains/CurtainsMeasure'
+import { HeatingMeasure } from './measures/heating/HeatingMeasure'
 import { TemplatesPage } from './TemplatesPage'
 import { HomePage } from './HomePage'
 import { TasksPage } from './TasksPage'
 
 function App() {
   // Helper to determine initial view based on URL hash
-  const getInitialView = (): 'home' | 'templates' | 'windows' | 'walls' | 'tasks' => {
+  const getInitialView = (): 'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' => {
     const hash = window.location.hash
     if (hash === '#/templates') return 'templates'
     if (hash === '#/windows') return 'windows'
     if (hash === '#/walls') return 'walls'
+    if (hash === '#/curtains') return 'curtains'
+    if (hash === '#/heating') return 'heating'
     if (hash === '#/tasks') return 'tasks'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'walls' | 'tasks'>(getInitialView)
+  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks'>(getInitialView)
 
   // Sync URL hash when view changes
   useEffect(() => {
@@ -30,6 +34,8 @@ function App() {
       templates: '#/templates',
       windows: '#/windows',
       walls: '#/walls',
+      curtains: '#/curtains',
+      heating: '#/heating',
       tasks: '#/tasks',
     }
     const target = hashMap[currentView] ?? '#/'
@@ -45,6 +51,8 @@ function App() {
       if (hash === '#/templates') setCurrentView('templates')
       else if (hash === '#/windows') setCurrentView('windows')
       else if (hash === '#/walls') setCurrentView('walls')
+      else if (hash === '#/curtains') setCurrentView('curtains')
+      else if (hash === '#/heating') setCurrentView('heating')
       else if (hash === '#/tasks') setCurrentView('tasks')
       else if (hash === '#/' || hash === '') setCurrentView('home')
     }
@@ -100,6 +108,10 @@ function App() {
         <WindowsMeasure />
       ) : currentView === 'walls' ? (
         <WallsMeasure />
+      ) : currentView === 'curtains' ? (
+        <CurtainsMeasure />
+      ) : currentView === 'heating' ? (
+        <HeatingMeasure />
       ) : currentView === 'tasks' ? (
         <TasksPage />
       ) : null}
