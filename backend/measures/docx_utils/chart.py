@@ -37,7 +37,9 @@ def render_npv_chart(series: List[dict]) -> bytes:
     ax.minorticks_on()  # Включаем промежуточные деления
 
     # --- НОВЫЕ СТРОКИ: ПРИНУДИТЕЛЬНЫЙ ШАГ ДЛЯ ЦИФР ---
+    from matplotlib.ticker import MaxNLocator
     ax.xaxis.set_major_locator(MultipleLocator(1))       # Цифры по оси X каждый 1 год
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=10))    # Стабильно 10 делений по оси Y
     # -------------------------------------------------
 
     ax.grid(which="major", color="#999999", linestyle="-", linewidth=0.5)
