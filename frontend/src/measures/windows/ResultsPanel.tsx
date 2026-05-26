@@ -12,7 +12,7 @@ export function ResultsPanel({ result }: Props) {
   return (
     <section className="block panel--ok" aria-live="polite">
       <header className="block__header">
-        <h2>Результаты</h2>
+        <h2><span className="title-icon">📈</span>Результаты</h2>
       </header>
 
       <h3>По зданиям</h3>
@@ -21,7 +21,7 @@ export function ResultsPanel({ result }: Props) {
           <thead>
             <tr>
               <th>Здание</th>
-              <th>S, м²</th>
+              <th>L, м.п.</th>
               <th>Q_т, Гкал</th>
               <th>Q_inf, Гкал</th>
               <th>Q итого, Гкал</th>

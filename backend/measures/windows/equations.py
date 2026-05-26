@@ -183,6 +183,7 @@ def _equals_with_value(value_text: str) -> list[etree._Element]:
 def eq_q_kwh(
     *,
     subscript: str,
+    r_subscript: str,
     area: str,
     r_val: str,
     t_in: str,
@@ -190,15 +191,15 @@ def eq_q_kwh(
     period_days: str,
     result_kwh: str,
 ) -> etree._Element:
-    """`Q_{sub} = S / R_{sub} * (t_вн - t_н.ср) * 10^-3 * N_от * 24 = ... кВт*ч`"""
+    """`Q_{sub} = S / R_{r_sub} * (t_в - t_н) * 10^-3 * z * 24 = ... кВт*ч`"""
     
     line1 = [
         m_sub([m_var("Q")], [m_num(subscript)]),
         m_op(" = "),
-        m_frac([m_var("S")], [m_sub([m_var("R")], [m_num(subscript)])]),
-        m_op(" · "), m_paren([m_sub([m_var("t")], [m_run("вн")]), m_op(" − "), m_sub([m_var("t")], [m_run("н.ср")])]),
+        m_frac([m_var("L")], [m_sub([m_var("R")], [m_run(r_subscript)])]),
+        m_op(" · "), m_paren([m_sub([m_var("t")], [m_run("в")]), m_op(" − "), m_sub([m_var("t")], [m_run("н")])]),
         m_op(" · "), m_sup([m_num("10")], [m_op("−"), m_num("3")]),
-        m_op(" · "), m_sub([m_var("N")], [m_run("от")]), m_op(" · "), m_num("24"),
+        m_op(" · "), m_var("z"), m_op(" · "), m_num("24"),
     ]
     
     t_out_fmt = f"({t_out_avg})" if t_out_avg.startswith("-") else t_out_avg
@@ -242,18 +243,19 @@ def eq_delta_q(
 def eq_q_inf_specific(
     *,
     label_sub: str,
+    g_inf_label: str,
     c_air: str,
     g_inf: str,
     k_factor: str,
     delta_t: str,
     result_kcal: str,
 ) -> etree._Element:
-    """`q_до = 0,28 · c · g_inf · k · ΔT = …` (или `q_после` через label_sub)."""
+    """`q_до = 0,28 · c · g_inf1 · k · ΔT = …` (или `q_после` / `g_inf2`)."""
     return _eq(
         m_sub([m_var("q")], [m_num(label_sub)]),
         m_op(" = "),
         m_num("0,28"), m_op(" · "), m_var("c"),
-        m_op(" · "), m_sub([m_var("g")], [m_num("inf")]),
+        m_op(" · "), m_sub([m_var("g")], [m_run(g_inf_label)]),
         m_op(" · "), m_var("k"), m_op(" · "), m_op("ΔT"),
         m_op(" = "),
         m_num("0,28"), m_op(" · "), m_num(c_air), m_op(" · "), m_num(g_inf),
@@ -276,7 +278,7 @@ def eq_q_infiltration(
         m_sub([m_var("Q")], [m_num("inf")]),
         m_op(" = "),
         m_paren([m_sub([m_var("q")], [m_num("до")]), m_op(" − "), m_sub([m_var("q")], [m_num("после")])]),
-        m_op(" · "), m_var("S"), m_op(" · "), m_var("z"), m_op(" · "), m_num("24"),
+        m_op(" · "), m_var("L"), m_op(" · "), m_var("z"), m_op(" · "), m_num("24"),
         m_op(" / "), m_sup([m_num("10")], [m_num("6")]),
     ]
     
@@ -303,11 +305,11 @@ def eq_v_gas(*, sum_q: str, calorific: str, result: str) -> etree._Element:
 
 
 def eq_money(*, gas_thousand: str, tariff: str, result: str) -> etree._Element:
-    """`Cэк = V · 1000 · Cээ = … тг`."""
+    """`CF = V · 1000 · C_тэ = … тг`."""
     return _eq(
-        m_sub([m_var("C")], [m_num("эк")]),
+        m_var("CF"),
         m_op(" = "), m_var("V"), m_op(" · "), m_num("1000"),
-        m_op(" · "), m_sub([m_var("C")], [m_num("ээ")]),
+        m_op(" · "), m_sub([m_var("C")], [m_run("тэ")]),
         m_op(" = "), m_num(gas_thousand), m_op(" · "), m_num("1000"),
         m_op(" · "), m_num(tariff),
         m_op(" = "), m_num(result), m_op(" тг"),
@@ -315,10 +317,10 @@ def eq_money(*, gas_thousand: str, tariff: str, result: str) -> etree._Element:
 
 
 def eq_pbp(*, investment: str, money: str, result: str) -> etree._Element:
-    """`PBP = Z / Cэк = … лет`."""
+    """`PBP = I / CF = … лет`."""
     return _eq(
         m_var("PBP"), m_op(" = "),
-        m_frac([m_var("Z")], [m_sub([m_var("C")], [m_num("эк")])]),
+        m_frac([m_var("I")], [m_var("CF")]),
         m_op(" = "),
         m_frac([m_num(investment)], [m_num(money)]),
         m_op(" = "), m_num(result), m_op(" лет"),

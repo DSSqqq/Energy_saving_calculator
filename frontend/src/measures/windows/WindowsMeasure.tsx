@@ -75,16 +75,19 @@ export function WindowsMeasure() {
   return (
     <main className="app">
       <header className="app__header">
-        <h1>Энерго-аудит. Мероприятие 1: окна</h1>
-        <p className="app__lead">
-          Расчёт экономии тепловой энергии (теплопередача и инфильтрация) по нескольким
-          зданиям; экспорт раздела отчёта в Word с формулами, таблицами и графиком NPV.
-        </p>
+        <h1><span className="title-icon">🪟</span>Мероприятие по ремонту оконных блоков</h1>
       </header>
 
       <BuildingsList
         buildings={input.buildings}
-        onChange={(buildings) => setInput({ ...input, buildings })}
+        onChange={(buildings) => {
+          const totalLength = buildings.reduce((s, b) => s + (b.area_m2 || 0), 0)
+          const investment_items = input.investment_items.map((it) => ({
+            ...it,
+            quantity: totalLength,
+          }))
+          setInput({ ...input, buildings, investment_items })
+        }}
       />
 
       <SharedParamsForm

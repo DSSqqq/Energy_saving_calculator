@@ -33,6 +33,7 @@ BODY_FIRST_LINE_INDENT = Emu(450215)
 # Шрифт и размер оригинала.
 FONT_NAME = "Times New Roman"
 FONT_SIZE = Pt(12)
+TABLE_FONT_SIZE = Pt(10)
 
 
 # --- абзацы -------------------------------------------------------------------
@@ -171,11 +172,15 @@ def _apply_table_style(table) -> None:
 
 
 def _set_cell_font(cell) -> None:
-    """Принудительно задаём Times New Roman 12pt для всех run-ов в ячейке."""
+    """Принудительно задаём Times New Roman 10pt для всех run-ов в ячейке."""
     for p in cell.paragraphs:
+        pf = p.paragraph_format
+        pf.space_before = Pt(1)
+        pf.space_after = Pt(1)
+        pf.line_spacing = 1.0
         for run in p.runs:
             run.font.name = FONT_NAME
-            run.font.size = FONT_SIZE
+            run.font.size = TABLE_FONT_SIZE
 
 
 def make_audit_table(
@@ -203,9 +208,12 @@ def make_audit_table(
         cell.text = ""
         p = cell.paragraphs[0]
         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        p.paragraph_format.space_before = Pt(1)
+        p.paragraph_format.space_after = Pt(1)
+        p.paragraph_format.line_spacing = 1.0
         run = p.add_run(value)
         run.font.name = FONT_NAME
-        run.font.size = FONT_SIZE
+        run.font.size = TABLE_FONT_SIZE
         run.bold = False  # В оригинале шапки не жирные (кроме Table 4)
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         _set_cell_background(cell, "D9E2F3")
@@ -221,9 +229,12 @@ def make_audit_table(
                 if idx in numeric_columns
                 else WD_PARAGRAPH_ALIGNMENT.LEFT
             )
+            p.paragraph_format.space_before = Pt(1)
+            p.paragraph_format.space_after = Pt(1)
+            p.paragraph_format.line_spacing = 1.0
             run = p.add_run(str(value))
             run.font.name = FONT_NAME
-            run.font.size = FONT_SIZE
+            run.font.size = TABLE_FONT_SIZE
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 # Применяем заданную ширину к каждой ячейке
     if col_widths:

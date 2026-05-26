@@ -4,23 +4,23 @@
 Все функции — чистые (не знают про Django/HTTP), легко покрываются юнит-тестами.
 
 Обозначения:
-- S        — площадь проблемных участков, м²
+- L        — длина проблемных участков, м.п.
 - z        — продолжительность отопительного периода, сут.
 - t_in     — температура внутри помещения, °C
 - t_out    — средняя температура наружного воздуха за период, °C
-- R_до/R_после — сопротивление теплопередаче, м²·°C/Вт
-- g_inf    — коэффициент воздухопроницаемости, кг/(м²·ч)
+- R_до/R_после — сопротивление теплопередаче, м.п.·°C/Вт
+- g_inf    — коэффициент воздухопроницаемости, кг/(м.п.·ч)
 - c        — удельная теплоёмкость воздуха, ккал/(кг·°С)
 - k        — коэф. влияния встречного теплового потока
 
 Формулы (в Гкал/год):
 - ΔT      = t_in − t_out
-- Q_т     = S · ΔT · z · 24 · (1/R_до − 1/R_после) / 10⁶
-- q_inf   = 0,28 · c · g_inf · k · ΔT          [ккал/(м²·ч)]
-- Q_inf   = (q_до − q_после) · S · z · 24 / 10⁶
+- Q_т     = L · ΔT · z · 24 · (1/R_до − 1/R_после) / 10⁶
+- q_inf   = 0,28 · c · g_inf · k · ΔT          [ккал/(м.п.·ч)]
+- Q_inf   = (q_до − q_после) · L · z · 24 / 10⁶
 
 Перевод в природный газ: V_газа [тыс. м³] = ΣQ / a, где a — теплотворная (Гкал/тыс.м³).
-Деньги: Cэк = V_газа · 1000 · тариф [тг/м³].
+Деньги: CF = V_газа · 1000 · тариф [тг/м³].
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def _q_transmission_gcal(*, q1_kwh, q2_kwh) -> float:
 
 
 def _q_specific_inf_kcal_per_m2_h(*, c_air, g_inf, k_factor, dt) -> float:
-    # 0,28 — переводной коэффициент в ккал/(м²·ч) для удельных теплопотерь на инфильтрацию.
+    # 0,28 — переводной коэффициент в ккал/(м.п.·ч) для удельных теплопотерь на инфильтрацию.
     return 0.28 * c_air * g_inf * k_factor * dt
 
 
@@ -124,20 +124,18 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
         share = row["q_total_gcal"] / total_q_gcal if total_q_gcal else 0.0
         row["money_savings_tg"] = money_savings_tg * share
 
-    # Инвестиции: каждая строка сметы — цена за единицу × суммарная площадь S_total.
+    # Инвестиции: каждая строка сметы — цена за единицу × количество (м.п.).
     investment_rows: List[Dict[str, Any]] = []
     investment_total = 0.0
     for item in payload["investment_items"]:
-        qty_per_m2 = item.get("qty_per_m2", 1.0)
-        total_quantity = total_area * qty_per_m2
-        cost = item["price_per_unit"] * total_quantity
+        quantity = item["quantity"]
+        cost = item["price_per_unit"] * quantity
         investment_total += cost
         investment_rows.append(
             {
                 "name": item["name"],
-                "unit": item["unit"],
+                "quantity": quantity,
                 "price_per_unit": item["price_per_unit"],
-                "quantity": total_quantity,
                 "cost_tg": cost,
             }
         )
@@ -157,10 +155,14 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
         rate=rate, cash_flow=cash_flow, years=horizon, investment=investment_total
     )
 
+    # Суммарное количество м.п. (для таблицы 3.3.6.4).
+    total_quantity_lm = sum(r["quantity"] for r in investment_rows)
+
     return {
         "buildings": buildings_out,
         "totals": {
             "area_m2": total_area,
+            "quantity_lm": total_quantity_lm,
             "q_total_gcal": total_q_gcal,
             "gas_thousand_m3": gas_thousand_m3,
             "money_savings_tg": money_savings_tg,

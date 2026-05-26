@@ -54,12 +54,11 @@ class SharedParamsSerializer(serializers.Serializer):
 
 
 class InvestmentItemSerializer(serializers.Serializer):
-    """Строка сметы: цена за единицу применяется ко всей суммарной площади S_total."""
+    """Строка сметы: количество в м.п. × цена за единицу."""
 
     name = serializers.CharField(max_length=200)
-    unit = serializers.CharField(max_length=50, default="тенге/м²")
+    quantity = serializers.FloatField(min_value=0)
     price_per_unit = serializers.FloatField(min_value=0)
-    qty_per_m2 = serializers.FloatField(min_value=0, default=1.0)
 
 
 class FinanceParamsSerializer(serializers.Serializer):

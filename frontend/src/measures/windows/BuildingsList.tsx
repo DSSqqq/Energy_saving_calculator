@@ -36,7 +36,7 @@ export function BuildingsList({ buildings, onChange }: Props) {
   return (
     <section className="block">
       <header className="block__header">
-        <h2>Здания</h2>
+        <h2><span className="title-icon">🏢</span>Здания</h2>
         <button type="button" className="btn btn--ghost" onClick={add}>
           + Добавить здание
         </button>
@@ -69,7 +69,11 @@ export function BuildingsList({ buildings, onChange }: Props) {
               <button
                 type="button"
                 className="btn btn--danger"
-                onClick={() => remove(idx)}
+                onClick={() => {
+                  if (window.confirm('Вы уверены, что хотите удалить это здание?')) {
+                    remove(idx)
+                  }
+                }}
                 disabled={buildings.length === 1}
                 title={buildings.length === 1 ? 'Нужно хотя бы одно здание' : 'Удалить'}
               >
@@ -78,7 +82,7 @@ export function BuildingsList({ buildings, onChange }: Props) {
             </div>
             <div className="grid">
               <NumberField
-                label="Площадь проблемных участков, м²"
+                label="Длина проблемных участков, м.п."
                 value={b.area_m2}
                 onChange={(v) => update(idx, { area_m2: v })}
                 step={0.01}
@@ -104,28 +108,28 @@ export function BuildingsList({ buildings, onChange }: Props) {
                 step={0.1}
               />
               <NumberField
-                label="R до, м²·°C/Вт"
+                label="R до, м.п.·°C/Вт"
                 value={b.r_before}
                 onChange={(v) => update(idx, { r_before: v })}
                 step={0.01}
                 min={0.01}
               />
               <NumberField
-                label="R после, м²·°C/Вт"
+                label="R после, м.п.·°C/Вт"
                 value={b.r_after}
                 onChange={(v) => update(idx, { r_after: v })}
                 step={0.01}
                 min={0.01}
               />
               <NumberField
-                label="g_inf до, кг/(м²·ч)"
+                label="g_inf до, кг/(м.п.·ч)"
                 value={b.g_inf_before}
                 onChange={(v) => update(idx, { g_inf_before: v })}
                 step={0.1}
                 min={0}
               />
               <NumberField
-                label="g_inf после, кг/(м²·ч)"
+                label="g_inf после, кг/(м.п.·ч)"
                 value={b.g_inf_after}
                 onChange={(v) => update(idx, { g_inf_after: v })}
                 step={0.1}

@@ -42,9 +42,9 @@ const sharedDefaults: SharedParams = {
 }
 
 const investmentDefaults: InvestmentItem[] = [
-  { name: 'Герметик силиконовый', unit: 'тенге/м.п.', price_per_unit: 1041.2, qty_per_m2: 3.5 },
-  { name: 'Уплотнительные резинки', unit: 'тенге/м.п.', price_per_unit: 193.5, qty_per_m2: 3.5 },
-  { name: 'Монтажная пена и доп. материалы', unit: 'тенге/м.п.', price_per_unit: 318, qty_per_m2: 3.5 },
+  { name: 'Герметик силиконовый', quantity: 87.33, price_per_unit: 1041.2 },
+  { name: 'Уплотнительные резинки', quantity: 87.33, price_per_unit: 193.5 },
+  { name: 'Монтажная пена и доп. материалы', quantity: 87.33, price_per_unit: 318 },
 ]
 
 const financeDefaults: FinanceParams = {
@@ -76,5 +76,5 @@ export function emptyBuilding(): Building {
 }
 
 export function emptyInvestmentItem(): InvestmentItem {
-  return { name: 'Материал', unit: 'тенге/м.п.', price_per_unit: 0, qty_per_m2: 3.5 }
+  return { name: 'Материал', quantity: 0, price_per_unit: 0 }
 }

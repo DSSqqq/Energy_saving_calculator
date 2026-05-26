@@ -82,7 +82,7 @@ def build_docx(payload: Dict[str, Any], results: Dict[str, Any]) -> bytes:
         _section_per_building_infiltration(doc, first_building, payload["shared"])
         
         if len(results["buildings"]) > 1:
-            add_body_paragraph(doc, "Для остальных зданий расчёт выполняется аналогично.")
+            add_body_paragraph(doc, "Алгоритм расчета для остальных сооружений идентичен вышеописанному (см. таблицу 3.3.6.4).")
             doc.add_paragraph()
 
     _section_totals(doc, payload, results)
@@ -152,6 +152,44 @@ def _bullet_paragraph(doc, text: str) -> None:
     run.font.size = Pt(12)
 
 
+def _bullet_rich(doc, *segments) -> None:
+    """Маркированная строка с подстрочными индексами.
+
+    Каждый segment — либо str (обычный текст), либо tuple (base, sub),
+    где base — текст перед индексом, sub — подстрочный текст.
+    Пример: _bullet_rich(doc, "Средняя наружная температура: ", ("t", "н"), " = 20 °С")
+    """
+    from docx.oxml.ns import qn as _qn
+    from docx.oxml import OxmlElement
+
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.left_indent = Cm(1.89)
+    p.paragraph_format.first_line_indent = Cm(-0.63)
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.space_before = Pt(0)
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+
+    def _add_run(text, subscript=False):
+        run = p.add_run(text)
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(12)
+        if subscript:
+            rpr = run._element.get_or_add_rPr()
+            va = OxmlElement("w:vertAlign")
+            va.set(_qn("w:val"), "subscript")
+            rpr.append(va)
+
+    for seg in segments:
+        if isinstance(seg, str):
+            _add_run(seg)
+        elif isinstance(seg, tuple) and len(seg) == 2:
+            base, sub = seg
+            _add_run(base)
+            _add_run(sub, subscript=True)
+        else:
+            _add_run(str(seg))
+
+
 # --- секции -------------------------------------------------------------------
 
 def _section_table_1(doc, results: Dict[str, Any]) -> None:
@@ -193,9 +231,9 @@ def _section_table_1(doc, results: Dict[str, Any]) -> None:
     
     headers = [
         "Наименование здания",
-        "Площадь проблемных участков, м²",
-        "Фактическое сопротивление теплопередаче окон до мероприятия, м²·°С/Вт",
-        "Сопротивление теплопередаче окон после мероприятия, м²·°С/Вт",
+        "Длина проблемных участков, м.п.",
+        "Фактическое сопротивление теплопередаче проблемных участков до мероприятия, м.п.·°С/Вт",
+        "Сопротивление теплопередаче проблемных участков после мероприятия, м.п.·°С/Вт",
         "Продолжительность отопительного периода, сут.",
         "Температура внутри помещения, °С",
         "Средняя температура наружного воздуха за отопительный период, °С"
@@ -224,41 +262,46 @@ def _section_per_building_transmission(doc, b: Dict[str, Any]) -> None:
         f"Ниже представлен расчёт теплопотерь через дефекты оконных блоков для здания {b['name']}.",
     )
     add_body_paragraph(doc, "Исходные данные:", first_line_indent=False)
-    _bullet_paragraph(doc, f"Площадь светопрозрачных ограждений: S = {fmt_num(b['area_m2'], 2)} м²")
-    _bullet_paragraph(doc, f"Средняя наружная температура: t_н = {fmt_num(b['t_outside_avg'], 1)} °С")
-    _bullet_paragraph(doc, f"Внутренняя температура: t_в = {fmt_num(b['t_inside'], 1)} °С")
+    _bullet_paragraph(doc, f"Длина проблемных участков: L = {fmt_num(b['area_m2'], 2)} м.п.")
+    _bullet_rich(doc, "Средняя наружная температура: ", ("t", "н"), f" = {fmt_num(b['t_outside_avg'], 1)} °С")
+    _bullet_rich(doc, "Внутренняя температура: ", ("t", "в"), f" = {fmt_num(b['t_inside'], 1)} °С")
     _bullet_paragraph(doc, f"Продолжительность отопительного периода: z = {fmt_num(b['period_days'], 0)} сут.")
-    _bullet_paragraph(doc, f"Сопротивление теплопередаче до мероприятия: R_до = {fmt_num(b['r_before'], 2)} м²·°С/Вт")
-    _bullet_paragraph(doc, f"Сопротивление теплопередаче после мероприятия: R_после = {fmt_num(b['r_after'], 2)} м²·°С/Вт")
+    _bullet_rich(doc, "Сопротивление теплопередаче до мероприятия: ", ("R", "до"), f" = {fmt_num(b['r_before'], 2)} м.п.·°С/Вт")
+    _bullet_rich(doc, "Сопротивление теплопередаче после мероприятия: ", ("R", "после"), f" = {fmt_num(b['r_after'], 2)} м.п.·°С/Вт")
     add_body_paragraph(doc, "Теплопотери до мероприятия:")
+    doc.add_paragraph() # <--- Пустая строка
     _add_equation(
         doc,
         eq.eq_q_kwh(
             subscript="1",
+            r_subscript="до",
             area=fmt_num(b["area_m2"], 2),
             r_val=fmt_num(b["r_before"], 2),
-            t_in=fmt_num(b["delta_t"] + b["t_outside_avg"], 1),
+            t_in=fmt_num(b["t_inside"], 1),
             t_out_avg=fmt_num(b["t_outside_avg"], 1),
             period_days=fmt_num(b["period_days"], 0),
             result_kwh=fmt_num(b["q1_kwh"], 1),
         ),
     )
-    
+    doc.add_paragraph() # <--- Пустая строка
     add_body_paragraph(doc, "Теплопотери после мероприятия:")
+    doc.add_paragraph() # <--- Пустая строка
     _add_equation(
         doc,
         eq.eq_q_kwh(
             subscript="2",
+            r_subscript="после",
             area=fmt_num(b["area_m2"], 2),
             r_val=fmt_num(b["r_after"], 2),
-            t_in=fmt_num(b["delta_t"] + b["t_outside_avg"], 1),
+            t_in=fmt_num(b["t_inside"], 1),
             t_out_avg=fmt_num(b["t_outside_avg"], 1),
             period_days=fmt_num(b["period_days"], 0),
             result_kwh=fmt_num(b["q2_kwh"], 1),
         ),
     )
-    
+    doc.add_paragraph() # <--- Пустая строка
     add_body_paragraph(doc, "Экономия тепловой энергии, Гкал:")
+    doc.add_paragraph() # <--- Пустая строка
     _add_equation(
         doc,
         eq.eq_delta_q(
@@ -274,16 +317,18 @@ def _section_per_building_infiltration(doc, b: Dict[str, Any], shared: Dict[str,
     add_body_paragraph(
         doc,
         f"Расчёт удельного расхода теплоты на нагревание инфильтрующегося воздуха через "
-        f"оконные блоки для здания {b['name']}, ккал/(м²·ч):",
+        f"оконные блоки для здания {b['name']}, ккал/(м.п.·ч):",
     )
     add_body_paragraph(doc, "Исходные данные:", first_line_indent=False)
-    _bullet_paragraph(
+    _bullet_rich(
         doc,
-        f"g_inf1 = {fmt_num(b['g_inf_before'], 2)} кг/(м²·ч), коэффициент воздухопроницаемости существующих окон;",
+        ("g", "inf1"),
+        f" = {fmt_num(b['g_inf_before'], 2)} кг/(м.п.·ч), коэффициент воздухопроницаемости существующих окон;",
     )
-    _bullet_paragraph(
+    _bullet_rich(
         doc,
-        f"g_inf2 = {fmt_num(b['g_inf_after'], 2)} кг/(м²·ч), коэффициент воздухопроницаемости устанавливаемых окон;",
+        ("g", "inf2"),
+        f" = {fmt_num(b['g_inf_after'], 2)} кг/(м.п.·ч), коэффициент воздухопроницаемости устанавливаемых окон;",
     )
     _bullet_paragraph(
         doc,
@@ -293,12 +338,13 @@ def _section_per_building_infiltration(doc, b: Dict[str, Any], shared: Dict[str,
         doc,
         f"k = {fmt_num(shared['k_factor'], 2)}, коэффициент влияния встречного теплового потока.",
     )
-    add_body_paragraph(doc, "До мероприятия, ккал/(м²·ч):", first_line_indent=False)
+    add_body_paragraph(doc, "До мероприятия, ккал/(м.п.·ч):", first_line_indent=False)
     doc.add_paragraph() # <--- Пустая строка
     _add_equation(
         doc,
         eq.eq_q_inf_specific(
             label_sub="до",
+            g_inf_label="inf1",
             c_air=fmt_num(shared["c_air"], 2),
             g_inf=fmt_num(b["g_inf_before"], 2),
             k_factor=fmt_num(shared["k_factor"], 2),
@@ -307,12 +353,13 @@ def _section_per_building_infiltration(doc, b: Dict[str, Any], shared: Dict[str,
         ),
     )
     doc.add_paragraph() # <--- Пустая строка
-    add_body_paragraph(doc, "После мероприятия, ккал/(м²·ч):", first_line_indent=False)
+    add_body_paragraph(doc, "После мероприятия, ккал/(м.п.·ч):", first_line_indent=False)
     doc.add_paragraph() # <--- Пустая строка
     _add_equation(
         doc,
         eq.eq_q_inf_specific(
             label_sub="после",
+            g_inf_label="inf2",
             c_air=fmt_num(shared["c_air"], 2),
             g_inf=fmt_num(b["g_inf_after"], 2),
             k_factor=fmt_num(shared["k_factor"], 2),
@@ -356,7 +403,7 @@ def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> No
     add_body_paragraph(doc, f"ИТОГО: ΣQ = {fmt_num(totals['q_total_gcal'], 2)} Гкал", first_line_indent=False)
     add_body_paragraph(
         doc,
-        "Перевод в натуральные единицы (тыс. м³ газа); удельная теплота сгорания принята за "
+        "Перевод потребленных Гкал в объем природного газа (тыс. м³); удельная теплота сгорания принята за "
         f"{fmt_num(shared['gas_calorific_gcal_per_thousand_m3'], 2)} Гкал/тыс. м³:",
     )
     doc.add_paragraph() # <--- Пустая строка
@@ -382,13 +429,13 @@ def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> No
     doc.add_paragraph() # <--- Пустая строка
     add_body_paragraph(
         doc,
-        f"где Сээ = {fmt_num(shared['tariff_tg_per_m3'], 2)} тг/м³ — средняя цена тепловой энергии (см. таблицу 3.3.6.3).",
+        f"где Cтэ = {fmt_num(shared['tariff_tg_per_m3'], 2)} тг/м³ — средняя цена тепловой энергии.",
     )
     invest = results["investment"]
     add_body_paragraph(doc, "Стоимость затрат на внедрение мероприятия, тг:")
     add_body_paragraph(
         doc,
-        f"Z = {fmt_money(invest['total_tg'])} тг (см. таблицу 3.3.6.3).",
+        f"I = {fmt_money(invest['total_tg'])} тг (см. таблицу 3.3.6.3).",
         first_line_indent=False,
     )
     add_body_paragraph(doc, "Простой срок окупаемости мероприятия, год:")
@@ -417,21 +464,20 @@ def _section_table_3(doc, results: Dict[str, Any]) -> None:
     # ---------------------------------------
     rows = []
     for item in results["investment"]["items"]:
-        unit_str = item['unit'].split('/')[-1] if '/' in item['unit'] else "ед."
         rows.append(
             (
                 item["name"],
-                f"{fmt_num(item['quantity'], 2)} {unit_str}",
-                f"{fmt_num(item['price_per_unit'], 2)} {item['unit']}",
+                fmt_num(item["quantity"], 2),
+                fmt_num(item["price_per_unit"], 2),
                 fmt_money(item["cost_tg"]),
             )
         )
-    rows.append(("Итого", "—", "—", f"{fmt_money(results['investment']['total_tg'])} тенге"))
+    rows.append(("Итого", "—", "—", fmt_money(results['investment']['total_tg'])))
     make_audit_table(
         doc,
-        ["Материал", "Количество", "Цена за м²/ед.", "Стоимость"],
+        ["Материал", "Количество, м.п.", "Цена за ед., тг", "Стоимость, тг"],
         rows,
-        numeric_columns=[1, 2, 3],col_widths=[Cm(7), Cm(3), Cm(4), Cm(3)]
+        numeric_columns=[1, 2, 3], col_widths=[Cm(6), Cm(3), Cm(4), Cm(4)]
     )
     doc.add_paragraph() # <--- Пустая строка
 
@@ -450,7 +496,6 @@ def _section_table_4(doc, results: Dict[str, Any]) -> None:
         rows.append(
             (
                 b["name"],
-                fmt_num(b["area_m2"], 2),
                 fmt_num(b["q_total_gcal"], 2),
                 fmt_money(b["money_savings_tg"]),
             )
@@ -458,7 +503,6 @@ def _section_table_4(doc, results: Dict[str, Any]) -> None:
     rows.append(
         (
             "ИТОГО",
-            fmt_num(results["totals"]["area_m2"], 2),
             fmt_num(results["totals"]["q_total_gcal"], 2),
             fmt_money(results["totals"]["money_savings_tg"]),
         )
@@ -467,12 +511,11 @@ def _section_table_4(doc, results: Dict[str, Any]) -> None:
         doc,
         [
             "Наименование здания",
-            "Площадь ремонта (S_ок), м²",
             "Экономия энергии, Гкал",
             "Экономия в денежном выражении, тг",
         ],
         rows,
-        numeric_columns=[1, 2, 3],col_widths=[Cm(5), Cm(4), Cm(4), Cm(4)]
+        numeric_columns=[1, 2], col_widths=[Cm(6), Cm(5), Cm(6)]
     )
     
     doc.add_paragraph() # <--- Пустая строка

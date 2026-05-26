@@ -1,4 +1,4 @@
-/** Редактируемая таблица сметы (Таблица 3.3.6.3): материал/ед./цена. */
+/** Редактируемая таблица сметы (Таблица 3.3.6.3): материал/количество м.п./цена. */
 import type { InvestmentItem } from './types'
 import { emptyInvestmentItem } from './defaults'
 
@@ -20,7 +20,7 @@ export function InvestmentTable({ items, onChange }: Props) {
   return (
     <section className="block">
       <header className="block__header">
-        <h2>Смета (Таблица 3.3.6.3)</h2>
+        <h2><span className="title-icon">💰</span>Смета (Таблица 3.3.6.3)</h2>
         <button type="button" className="btn btn--ghost" onClick={add}>
           + Добавить строку
         </button>
@@ -29,9 +29,8 @@ export function InvestmentTable({ items, onChange }: Props) {
         <thead>
           <tr>
             <th>Материал</th>
-            <th>Ед. изм.</th>
-            <th>Расход на 1 м²</th>
-            <th>Цена за ед.</th>
+            <th>Количество, м.п.</th>
+            <th>Цена за ед., тг</th>
             <th />
           </tr>
         </thead>
@@ -47,19 +46,12 @@ export function InvestmentTable({ items, onChange }: Props) {
               </td>
               <td>
                 <input
-                  type="text"
-                  value={it.unit}
-                  onChange={(e) => update(idx, { unit: e.target.value })}
-                />
-              </td>
-              <td>
-                <input
                   type="number"
                   step="any"
                   min={0}
-                  value={Number.isFinite(it.qty_per_m2) ? it.qty_per_m2 : ''}
+                  value={Number.isFinite(it.quantity) ? it.quantity : ''}
                   onChange={(e) =>
-                    update(idx, { qty_per_m2: Number(e.target.value) })
+                    update(idx, { quantity: Number(e.target.value) })
                   }
                 />
               </td>
@@ -78,7 +70,11 @@ export function InvestmentTable({ items, onChange }: Props) {
                 <button
                   type="button"
                   className="btn btn--danger btn--small"
-                  onClick={() => remove(idx)}
+                  onClick={() => {
+                    if (window.confirm('Вы уверены, что хотите удалить эту строку из сметы?')) {
+                      remove(idx)
+                    }
+                  }}
                 >
                   ×
                 </button>

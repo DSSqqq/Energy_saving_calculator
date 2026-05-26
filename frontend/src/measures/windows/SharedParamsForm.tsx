@@ -15,7 +15,7 @@ export function SharedParamsForm({ shared, finance, onSharedChange, onFinanceCha
   return (
     <section className="block">
       <header className="block__header">
-        <h2>Общие параметры расчёта</h2>
+        <h2><span className="title-icon">⚙️</span>Общие параметры расчёта</h2>
       </header>
       <div className="grid">
 

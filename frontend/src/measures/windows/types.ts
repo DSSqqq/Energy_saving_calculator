@@ -44,9 +44,8 @@ export type SharedParams = {
 
 export type InvestmentItem = {
   name: string
-  unit: string
+  quantity: number
   price_per_unit: number
-  qty_per_m2: number
 }
 
 export type FinanceParams = {
@@ -83,7 +82,6 @@ export type CalculateResponse = {
   investment: {
     items: Array<{
       name: string
-      unit: string
       price_per_unit: number
       quantity: number
       cost_tg: number
