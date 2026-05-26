@@ -361,6 +361,20 @@ def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> No
         )
         doc.add_paragraph()
         
+        # --- РУЧНОЕ СОЗДАНИЕ ПОДПИСИ ТАБЛИЦЫ ---
+        p_cap = doc.add_paragraph()
+        p_cap.paragraph_format.first_line_indent = None
+        p_cap.paragraph_format.space_before = Pt(6)
+        p_cap.paragraph_format.space_after = Pt(0)
+        p_cap.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+        
+        add_runs_with_highlight(
+            p_cap,
+            "Таблица 3.3.7.1a - Параметры индивидуального теплоснабжения и экономии",
+            italic=True
+        )
+        # ---------------------------------------
+        
         tbl_headers = [
             "Наименование здания",
             "Источник отопления",
