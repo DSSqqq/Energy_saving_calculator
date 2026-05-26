@@ -45,12 +45,18 @@ class SharedParamsSerializer(serializers.Serializer):
 
     c_air = serializers.FloatField(default=0.24, help_text="Удельная теплоёмкость воздуха, ккал/(кг·°С)")
     k_factor = serializers.FloatField(default=0.8, help_text="Коэф. влияния встречного теплового потока")
-    gas_calorific_gcal_per_thousand_m3 = serializers.FloatField(
-        default=8.19, help_text="Теплотворная способность газа, Гкал на 1000 м³"
+    fuel_type = serializers.ChoiceField(
+        choices=[
+            ("gas", "Природный газ"),
+            ("electricity", "Электрическая энергия"),
+            ("coal", "Каменный уголь"),
+            ("diesel", "Дизельное топливо"),
+            ("gcal", "Центральное теплоснабжение"),
+        ],
+        default="gas"
     )
-    tariff_tg_per_m3 = serializers.FloatField(
-        default=49.90, help_text="Тариф (тенге за 1 м³ природного газа)"
-    )
+    fuel_tariff = serializers.FloatField(min_value=0.0)
+    fuel_calorific = serializers.FloatField(min_value=0.00001)
 
 
 class InvestmentItemSerializer(serializers.Serializer):

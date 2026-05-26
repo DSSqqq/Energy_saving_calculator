@@ -1,26 +1,6 @@
 """
 Расчёт мероприятия «Окна»: формулы из шаблона аудита.
-
-Все функции — чистые (не знают про Django/HTTP), легко покрываются юнит-тестами.
-
-Обозначения:
-- L        — длина проблемных участков, м.п.
-- z        — продолжительность отопительного периода, сут.
-- t_in     — температура внутри помещения, °C
-- t_out    — средняя температура наружного воздуха за период, °C
-- R_до/R_после — сопротивление теплопередаче, м.п.·°C/Вт
-- g_inf    — коэффициент воздухопроницаемости, кг/(м.п.·ч)
-- c        — удельная теплоёмкость воздуха, ккал/(кг·°С)
-- k        — коэф. влияния встречного теплового потока
-
-Формулы (в Гкал/год):
-- ΔT      = t_in − t_out
-- Q_т     = L · ΔT · z · 24 · (1/R_до − 1/R_после) / 10⁶
-- q_inf   = 0,28 · c · g_inf · k · ΔT          [ккал/(м.п.·ч)]
-- Q_inf   = (q_до − q_после) · L · z · 24 / 10⁶
-
-Перевод в природный газ: V_газа [тыс. м³] = ΣQ / a, где a — теплотворная (Гкал/тыс.м³).
-Деньги: CF = V_газа · 1000 · тариф [тг/м³].
+Поддерживает множественные виды топлива (газ, электричество, уголь, дизель, центральное отопление).
 """
 from __future__ import annotations
 
@@ -62,8 +42,10 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     finance = payload["finance"]
     c_air = shared["c_air"]
     k_factor = shared["k_factor"]
-    a_gas = shared["gas_calorific_gcal_per_thousand_m3"]
-    tariff = shared["tariff_tg_per_m3"]
+    
+    fuel_type = shared.get("fuel_type", "gas")
+    fuel_tariff = shared.get("fuel_tariff", 0.0)
+    fuel_calorific = shared.get("fuel_calorific", 1.0)
 
     buildings_out: List[Dict[str, Any]] = []
     total_area = 0.0
@@ -116,8 +98,11 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-    gas_thousand_m3 = total_q_gcal / a_gas if a_gas else 0.0
-    money_savings_tg = gas_thousand_m3 * 1000.0 * tariff
+    # Расчет экономии топлива и денег
+    fuel_savings = total_q_gcal / fuel_calorific if fuel_calorific else 0.0
+    
+    multiplier = 1000.0 if fuel_type in ("gas", "electricity") else 1.0
+    money_savings_tg = fuel_savings * multiplier * fuel_tariff
 
     # Денежная экономия по зданиям пропорционально доле энергии.
     for row in buildings_out:
@@ -158,13 +143,23 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Суммарное количество м.п. (для таблицы 3.3.6.4).
     total_quantity_lm = sum(r["quantity"] for r in investment_rows)
 
+    FUEL_UNITS = {
+        "gas": "тыс. м³",
+        "electricity": "тыс. кВт·ч",
+        "coal": "тонн",
+        "diesel": "тонн",
+        "gcal": "Гкал",
+    }
+    fuel_unit = FUEL_UNITS.get(fuel_type, "Гкал")
+
     return {
         "buildings": buildings_out,
         "totals": {
             "area_m2": total_area,
             "quantity_lm": total_quantity_lm,
             "q_total_gcal": total_q_gcal,
-            "gas_thousand_m3": gas_thousand_m3,
+            "fuel_savings": fuel_savings,
+            "fuel_unit": fuel_unit,
             "money_savings_tg": money_savings_tg,
         },
         "investment": {

@@ -1,8 +1,7 @@
 /**
  * Типы и константы мероприятия «Окна».
  *
- * Должны соответствовать DRF-сериализаторам бэкенда
- * (backend/measures/windows/serializers.py) и docs/MEASURES/windows.md.
+ * Должны соответствовать DRF-сериализаторам бэкенда.
  */
 
 export type BuildingType = 'public' | 'industrial' | 'other'
@@ -35,11 +34,14 @@ export type Building = {
   g_inf_after: number
 }
 
+export type FuelType = 'gas' | 'electricity' | 'coal' | 'diesel' | 'gcal'
+
 export type SharedParams = {
   c_air: number
   k_factor: number
-  gas_calorific_gcal_per_thousand_m3: number
-  tariff_tg_per_m3: number
+  fuel_type: FuelType
+  fuel_tariff: number
+  fuel_calorific: number
 }
 
 export type InvestmentItem = {
@@ -76,7 +78,8 @@ export type CalculateResponse = {
   totals: {
     area_m2: number
     q_total_gcal: number
-    gas_thousand_m3: number
+    fuel_savings: number
+    fuel_unit: string
     money_savings_tg: number
   }
   investment: {
@@ -95,8 +98,8 @@ export type CalculateResponse = {
     npv_tg: number
     irr: number | null
     dpi: number
-    pbp_years: number
-    dpbp_years: number
+    pbp_years: number | null
+    dpbp_years: number | null
     npv_by_year: Array<{ year: number; discounted_cf: number; cumulative_npv: number }>
   }
 }

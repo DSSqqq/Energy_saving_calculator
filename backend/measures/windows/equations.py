@@ -334,3 +334,36 @@ def eq_sum_two(*, label: str, q_t: str, q_inf: str, total: str) -> etree._Elemen
         m_num(q_t), m_op(" + "), m_num(q_inf),
         m_op(" = "), m_num(total), m_op(" Гкал"),
     )
+
+
+def eq_fuel_savings(*, label: str, sum_q: str, calorific: str, result: str, unit: str) -> etree._Element:
+    """`V_топлива = ΣQ / a = … ед.изм`."""
+    return _eq(
+        m_sub([m_var("V")], [m_run(label)]),
+        m_op(" = "),
+        m_frac([m_op("ΣQ")], [m_var("a")]),
+        m_op(" = "),
+        m_frac([m_num(sum_q)], [m_num(calorific)]),
+        m_op(" = "), m_num(result), m_op(f" {unit}"),
+    )
+
+
+def eq_money_savings(*, fuel_val: str, tariff: str, multiplier: str, result: str) -> etree._Element:
+    """`CF = V · multiplier · C_тэ = … тг`."""
+    nodes = [
+        m_var("CF"),
+        m_op(" = "), m_var("V"),
+    ]
+    if multiplier != "1" and multiplier != "1.0":
+        nodes.extend([m_op(" · "), m_num(multiplier)])
+    nodes.extend([
+        m_op(" · "), m_sub([m_var("C")], [m_run("тэ")]),
+        m_op(" = "), m_num(fuel_val),
+    ])
+    if multiplier != "1" and multiplier != "1.0":
+        nodes.extend([m_op(" · "), m_num(multiplier)])
+    nodes.extend([
+        m_op(" · "), m_num(tariff),
+        m_op(" = "), m_num(result), m_op(" тг"),
+    ])
+    return _eq(*nodes)

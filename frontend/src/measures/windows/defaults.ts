@@ -37,8 +37,9 @@ const buildingFactory: Building = {
 const sharedDefaults: SharedParams = {
   c_air: 0.24,
   k_factor: 0.8,
-  gas_calorific_gcal_per_thousand_m3: 8.19,
-  tariff_tg_per_m3: 49.9,
+  fuel_type: 'gas',
+  fuel_tariff: 49.9,
+  fuel_calorific: 8.19,
 }
 
 const investmentDefaults: InvestmentItem[] = [

@@ -21,7 +21,7 @@ export function ResultsPanel({ result }: Props) {
           <thead>
             <tr>
               <th>Здание</th>
-              <th>L, м.п.</th>
+              <th>S, м²</th>
               <th>Q_т, Гкал</th>
               <th>Q_inf, Гкал</th>
               <th>Q итого, Гкал</th>
@@ -53,7 +53,7 @@ export function ResultsPanel({ result }: Props) {
       <h3>Экономика проекта</h3>
       <ul className="kpis">
         <li>
-          <strong>Объём газа:</strong> {fmtNumber(result.totals.gas_thousand_m3, 3)} тыс. м³
+          <strong>Экономия энергоносителя:</strong> {fmtNumber(result.totals.fuel_savings, 3)} {result.totals.fuel_unit}
         </li>
         <li>
           <strong>Инвестиции:</strong> {fmtMoney(result.investment.total_tg)} тг
@@ -69,11 +69,11 @@ export function ResultsPanel({ result }: Props) {
         </li>
         <li>
           <strong>PBP:</strong>{' '}
-          {Number.isFinite(f.pbp_years) ? `${fmtNumber(f.pbp_years)} лет` : 'не окупается'}
+          {f.pbp_years === null ? 'не окупается' : `${fmtNumber(f.pbp_years)} лет`}
         </li>
         <li>
           <strong>DPBP:</strong>{' '}
-          {Number.isFinite(f.dpbp_years) ? `${fmtNumber(f.dpbp_years)} лет` : 'не окупается'}
+          {f.dpbp_years === null ? 'не окупается' : `${fmtNumber(f.dpbp_years)} лет`}
         </li>
       </ul>
     </section>

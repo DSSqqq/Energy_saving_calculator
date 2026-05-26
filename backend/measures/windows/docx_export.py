@@ -401,36 +401,69 @@ def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> No
     totals = results["totals"]
     shared = payload["shared"]
     add_body_paragraph(doc, f"ИТОГО: ΣQ = {fmt_num(totals['q_total_gcal'], 2)} Гкал", first_line_indent=False)
-    add_body_paragraph(
-        doc,
-        "Перевод потребленных Гкал в объем природного газа (тыс. м³); удельная теплота сгорания принята за "
-        f"{fmt_num(shared['gas_calorific_gcal_per_thousand_m3'], 2)} Гкал/тыс. м³:",
-    )
-    doc.add_paragraph() # <--- Пустая строка
-    _add_equation(
-        doc,
-        eq.eq_v_gas(
-            sum_q=fmt_num(totals["q_total_gcal"], 2),
-            calorific=fmt_num(shared["gas_calorific_gcal_per_thousand_m3"], 2),
-            result=fmt_num(totals["gas_thousand_m3"], 3),
-        ),
-    )
-    doc.add_paragraph() # <--- Пустая строка
+    
+    FUEL_META = {
+        "gas": {"label": "природного газа", "label_nom": "Природный газ", "label_short": "газа", "fuel_unit": "тыс. м³", "tariff_unit": "тг/м³", "cv_unit": "Гкал/тыс. м³", "multiplier": "1000"},
+        "electricity": {"label": "электрической энергии", "label_nom": "Электрическая энергия", "label_short": "электр.", "fuel_unit": "тыс. кВт·ч", "tariff_unit": "тг/кВт·ч", "cv_unit": "Гкал/тыс. кВт·ч", "multiplier": "1000"},
+        "coal": {"label": "каменного угля", "label_nom": "Каменный уголь", "label_short": "угля", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна", "multiplier": "1"},
+        "diesel": {"label": "дизельного топлива", "label_nom": "Дизельное топливо", "label_short": "диз.", "fuel_unit": "тонн", "tariff_unit": "тг/тонна", "cv_unit": "Гкал/тонна", "multiplier": "1"},
+        "gcal": {"label": "тепловой энергии", "label_nom": "Центральное теплоснабжение", "label_short": "тепла", "fuel_unit": "Гкал", "tariff_unit": "тг/Гкал", "cv_unit": "Гкал/Гкал", "multiplier": "1"},
+    }
+    fuel_type = shared.get("fuel_type", "gas")
+    meta = FUEL_META.get(fuel_type, FUEL_META["gas"])
+
+    if fuel_type != "gcal":
+        add_body_paragraph(
+            doc,
+            f"Перевод потребленных Гкал в объем {meta['label']} ({meta['fuel_unit']}); удельная теплота сгорания принята за "
+            f"{fmt_num(shared['fuel_calorific'], 4)} {meta['cv_unit']}:",
+        )
+        doc.add_paragraph() # <--- Пустая строка
+        _add_equation(
+            doc,
+            eq.eq_fuel_savings(
+                label=meta["label_short"],
+                sum_q=fmt_num(totals["q_total_gcal"], 2),
+                calorific=fmt_num(shared["fuel_calorific"], 4),
+                result=fmt_num(totals["fuel_savings"], 3),
+                unit=meta["fuel_unit"],
+            ),
+        )
+        doc.add_paragraph() # <--- Пустая строка
+
     add_body_paragraph(doc, "Экономия тепловой энергии в денежном выражении, тг:")
     doc.add_paragraph() # <--- Пустая строка
-    _add_equation(
-        doc,
-        eq.eq_money(
-            gas_thousand=fmt_num(totals["gas_thousand_m3"], 3),
-            tariff=fmt_num(shared["tariff_tg_per_m3"], 2),
-            result=fmt_money(totals["money_savings_tg"]),
-        ),
-    )
-    doc.add_paragraph() # <--- Пустая строка
-    add_body_paragraph(
-        doc,
-        f"где Cтэ = {fmt_num(shared['tariff_tg_per_m3'], 2)} тг/м³ — средняя цена тепловой энергии.",
-    )
+    
+    if fuel_type != "gcal":
+        _add_equation(
+            doc,
+            eq.eq_money_savings(
+                fuel_val=fmt_num(totals["fuel_savings"], 3),
+                tariff=fmt_num(shared["fuel_tariff"], 2),
+                multiplier=meta["multiplier"],
+                result=fmt_money(totals["money_savings_tg"]),
+            ),
+        )
+        doc.add_paragraph() # <--- Пустая строка
+        add_body_paragraph(
+            doc,
+            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} {meta['tariff_unit']} — средняя цена {meta['label']}.",
+        )
+    else:
+        _add_equation(
+            doc,
+            eq.eq_money_savings(
+                fuel_val=fmt_num(totals["q_total_gcal"], 2),
+                tariff=fmt_num(shared["fuel_tariff"], 2),
+                multiplier="1",
+                result=fmt_money(totals["money_savings_tg"]),
+            ),
+        )
+        doc.add_paragraph() # <--- Пустая строка
+        add_body_paragraph(
+            doc,
+            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} тг/Гкал — средняя цена тепловой энергии.",
+        )
     invest = results["investment"]
     add_body_paragraph(doc, "Стоимость затрат на внедрение мероприятия, тг:")
     add_body_paragraph(
