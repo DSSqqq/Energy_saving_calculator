@@ -29,14 +29,19 @@ def _q_transmission_gcal(*, q1_kwh: float, q2_kwh: float) -> float:
 def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     shared = payload["shared"]
     finance = payload["finance"]
-    
-    fuel_type = shared.get("fuel_type", "gcal")
-    fuel_tariff = shared.get("fuel_tariff", 0.0)
-    fuel_calorific = shared.get("fuel_calorific", 1.0)
 
     buildings_out: List[Dict[str, Any]] = []
     total_area = 0.0
     total_q_gcal = 0.0
+    total_money_savings_tg = 0.0
+
+    FUEL_UNITS = {
+        "gas": "тыс. м³",
+        "electricity": "тыс. кВт·ч",
+        "coal": "тонн",
+        "diesel": "тонн",
+        "gcal": "Гкал",
+    }
 
     for b in payload["buildings"]:
         t_in = b["t_inside"]
@@ -53,6 +58,18 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
         total_area += b["area_m2"]
         total_q_gcal += q_t
 
+        # Individual building fuel and cost savings
+        b_fuel_type = b.get("fuel_type", "gcal")
+        b_fuel_tariff = b.get("fuel_tariff", 0.0)
+        b_fuel_calorific = b.get("fuel_calorific", 1.0)
+
+        b_fuel_savings = q_t / b_fuel_calorific if b_fuel_calorific else 0.0
+        multiplier = 1000.0 if b_fuel_type in ("gas", "electricity") else 1.0
+        b_money_savings_tg = b_fuel_savings * multiplier * b_fuel_tariff
+        total_money_savings_tg += b_money_savings_tg
+
+        b_fuel_unit = FUEL_UNITS.get(b_fuel_type, "Гкал")
+
         buildings_out.append(
             {
                 "name": b["name"],
@@ -63,24 +80,32 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "t_inside": t_in,
                 "r_before": b["r_before"],
                 "r_after": b["r_after"],
+                "fuel_type": b_fuel_type,
+                "fuel_tariff": b_fuel_tariff,
+                "fuel_calorific": b_fuel_calorific,
                 "delta_t": dt,
                 "q1_kwh": q1_kwh,
                 "q2_kwh": q2_kwh,
                 "q_transmission_gcal": q_t,
                 "q_total_gcal": q_t,
+                "fuel_savings": b_fuel_savings,
+                "fuel_unit": b_fuel_unit,
+                "money_savings_tg": b_money_savings_tg,
             }
         )
 
-    # Расчет экономии топлива и денег
-    fuel_savings = total_q_gcal / fuel_calorific if fuel_calorific else 0.0
-    
-    multiplier = 1000.0 if fuel_type in ("gas", "electricity") else 1.0
-    money_savings_tg = fuel_savings * multiplier * fuel_tariff
+    # Determine totals
+    first_fuel = buildings_out[0]["fuel_type"] if buildings_out else "gcal"
+    all_same_fuel = all(row["fuel_type"] == first_fuel for row in buildings_out)
 
-    # Денежная экономия по зданиям пропорционально доле энергии.
-    for row in buildings_out:
-        share = row["q_total_gcal"] / total_q_gcal if total_q_gcal else 0.0
-        row["money_savings_tg"] = money_savings_tg * share
+    if all_same_fuel:
+        fuel_savings = sum(row["fuel_savings"] for row in buildings_out)
+        fuel_unit = FUEL_UNITS.get(first_fuel, "Гкал")
+    else:
+        fuel_savings = 0.0
+        fuel_unit = "Смешанный"
+
+    money_savings_tg = total_money_savings_tg
 
     # Инвестиции.
     investment_rows: List[Dict[str, Any]] = []
@@ -114,15 +139,6 @@ def calculate(payload: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     total_quantity = sum(r["quantity"] for r in investment_rows)
-
-    FUEL_UNITS = {
-        "gas": "тыс. м³",
-        "electricity": "тыс. кВт·ч",
-        "coal": "тонн",
-        "diesel": "тонн",
-        "gcal": "Гкал",
-    }
-    fuel_unit = FUEL_UNITS.get(fuel_type, "Гкал")
 
     return {
         "buildings": buildings_out,

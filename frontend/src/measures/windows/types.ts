@@ -21,6 +21,8 @@ export const BUILDING_TYPE_PRESETS: Record<
   other: { period_days: 180, t_outside_avg: -8.0 },
 }
 
+export type FuelType = 'gas' | 'electricity' | 'coal' | 'diesel' | 'gcal'
+
 export type Building = {
   name: string
   type: BuildingType
@@ -32,16 +34,14 @@ export type Building = {
   r_after: number
   g_inf_before: number
   g_inf_after: number
+  fuel_type: FuelType
+  fuel_tariff: number
+  fuel_calorific: number
 }
-
-export type FuelType = 'gas' | 'electricity' | 'coal' | 'diesel' | 'gcal'
 
 export type SharedParams = {
   c_air: number
   k_factor: number
-  fuel_type: FuelType
-  fuel_tariff: number
-  fuel_calorific: number
 }
 
 export type InvestmentItem = {
@@ -71,6 +71,8 @@ export type BuildingResult = Building & {
   q_infiltration_gcal: number
   q_total_gcal: number
   money_savings_tg: number
+  fuel_savings: number
+  fuel_unit: string
 }
 
 export type CalculateResponse = {

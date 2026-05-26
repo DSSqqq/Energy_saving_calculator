@@ -27,6 +27,18 @@ class BuildingInputSerializer(serializers.Serializer):
     r_after = serializers.FloatField(min_value=0.01)
     g_inf_before = serializers.FloatField(min_value=0)
     g_inf_after = serializers.FloatField(min_value=0)
+    fuel_type = serializers.ChoiceField(
+        choices=[
+            ("gas", "Природный газ"),
+            ("electricity", "Электрическая энергия"),
+            ("coal", "Каменный уголь"),
+            ("diesel", "Дизельное топливо"),
+            ("gcal", "Центральное теплоснабжение"),
+        ],
+        default="gas"
+    )
+    fuel_tariff = serializers.FloatField(min_value=0.0)
+    fuel_calorific = serializers.FloatField(min_value=0.00001)
 
     def validate(self, attrs):
         if attrs["r_after"] <= attrs["r_before"]:
@@ -41,22 +53,10 @@ class BuildingInputSerializer(serializers.Serializer):
 
 
 class SharedParamsSerializer(serializers.Serializer):
-    """Общие константы расчёта и тарифы. Все редактируемые в UI."""
+    """Общие константы расчёта. Все редактируемые в UI."""
 
     c_air = serializers.FloatField(default=0.24, help_text="Удельная теплоёмкость воздуха, ккал/(кг·°С)")
     k_factor = serializers.FloatField(default=0.8, help_text="Коэф. влияния встречного теплового потока")
-    fuel_type = serializers.ChoiceField(
-        choices=[
-            ("gas", "Природный газ"),
-            ("electricity", "Электрическая энергия"),
-            ("coal", "Каменный уголь"),
-            ("diesel", "Дизельное топливо"),
-            ("gcal", "Центральное теплоснабжение"),
-        ],
-        default="gas"
-    )
-    fuel_tariff = serializers.FloatField(min_value=0.0)
-    fuel_calorific = serializers.FloatField(min_value=0.00001)
 
 
 class InvestmentItemSerializer(serializers.Serializer):

@@ -290,64 +290,106 @@ def _section_per_building_transmission(doc, b: Dict[str, Any]) -> None:
 
 def _section_totals(doc, payload: Dict[str, Any], results: Dict[str, Any]) -> None:
     totals = results["totals"]
-    shared = payload["shared"]
     add_body_paragraph(doc, f"ИТОГО: ΣQ = {fmt_num(totals['q_total_gcal'], 2)} Гкал", first_line_indent=False)
 
-    fuel_type = shared.get("fuel_type", "gcal")
-    meta = FUEL_META.get(fuel_type, FUEL_META["gcal"])
+    first_b = results["buildings"][0] if results["buildings"] else {}
+    first_fuel = first_b.get("fuel_type", "gcal")
+    all_same_fuel = all(row.get("fuel_type") == first_fuel for row in results["buildings"])
 
-    if fuel_type != "gcal":
-        add_body_paragraph(
-            doc,
-            f"Перевод потребленных Гкал в объем {meta['label']} ({meta['fuel_unit']}); удельная теплота сгорания принята за "
-            f"{fmt_num(shared['fuel_calorific'], 4)} {meta['cv_unit']}:",
-        )
-        doc.add_paragraph()
-        _add_equation(
-            doc,
-            eq.eq_fuel_savings(
-                label=meta["label_short"],
-                sum_q=fmt_num(totals["q_total_gcal"], 2),
-                calorific=fmt_num(shared["fuel_calorific"], 4),
-                result=fmt_num(totals["fuel_savings"], 3),
-                unit=meta["fuel_unit"],
-            ),
-        )
+    if all_same_fuel:
+        fuel_type = first_fuel
+        fuel_calorific = first_b.get("fuel_calorific", 1.0)
+        fuel_tariff = first_b.get("fuel_tariff", 0.0)
+        meta = FUEL_META.get(fuel_type, FUEL_META["gcal"])
+
+        if fuel_type != "gcal":
+            add_body_paragraph(
+                doc,
+                f"Перевод потребленных Гкал в объем {meta['label']} ({meta['fuel_unit']}); удельная теплота сгорания принята за "
+                f"{fmt_num(fuel_calorific, 4)} {meta['cv_unit']}:",
+            )
+            doc.add_paragraph()
+            _add_equation(
+                doc,
+                eq.eq_fuel_savings(
+                    label=meta["label_short"],
+                    sum_q=fmt_num(totals["q_total_gcal"], 2),
+                    calorific=fmt_num(fuel_calorific, 4),
+                    result=fmt_num(totals["fuel_savings"], 3),
+                    unit=meta["fuel_unit"],
+                ),
+            )
+            doc.add_paragraph()
+
+        add_body_paragraph(doc, "Экономия тепловой энергии в денежном выражении, тг:")
         doc.add_paragraph()
 
-    add_body_paragraph(doc, "Экономия тепловой энергии в денежном выражении, тг:")
-    doc.add_paragraph()
-
-    if fuel_type != "gcal":
-        _add_equation(
-            doc,
-            eq.eq_money_savings(
-                fuel_val=fmt_num(totals["fuel_savings"], 3),
-                tariff=fmt_num(shared["fuel_tariff"], 2),
-                multiplier=meta["multiplier"],
-                result=fmt_money(totals["money_savings_tg"]),
-            ),
-        )
-        doc.add_paragraph()
-        add_body_paragraph(
-            doc,
-            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} {meta['tariff_unit']} — средняя цена {meta['label']}.",
-        )
+        if fuel_type != "gcal":
+            _add_equation(
+                doc,
+                eq.eq_money_savings(
+                    fuel_val=fmt_num(totals["fuel_savings"], 3),
+                    tariff=fmt_num(fuel_tariff, 2),
+                    multiplier=str(meta["multiplier"]),
+                    result=fmt_money(totals["money_savings_tg"]),
+                ),
+            )
+            doc.add_paragraph()
+            add_body_paragraph(
+                doc,
+                f"где Cтэ = {fmt_num(fuel_tariff, 2)} {meta['tariff_unit']} — средняя цена {meta['label']}.",
+            )
+        else:
+            _add_equation(
+                doc,
+                eq.eq_money_savings(
+                    fuel_val=fmt_num(totals["q_total_gcal"], 2),
+                    tariff=fmt_num(fuel_tariff, 2),
+                    multiplier="1",
+                    result=fmt_money(totals["money_savings_tg"]),
+                ),
+            )
+            doc.add_paragraph()
+            add_body_paragraph(
+                doc,
+                f"где Cтэ = {fmt_num(fuel_tariff, 2)} тг/Гкал — средняя цена тепловой энергии.",
+            )
     else:
-        _add_equation(
-            doc,
-            eq.eq_money_savings(
-                fuel_val=fmt_num(totals["q_total_gcal"], 2),
-                tariff=fmt_num(shared["fuel_tariff"], 2),
-                multiplier="1",
-                result=fmt_money(totals["money_savings_tg"]),
-            ),
-        )
-        doc.add_paragraph()
         add_body_paragraph(
             doc,
-            f"где Cтэ = {fmt_num(shared['fuel_tariff'], 2)} тг/Гкал — средняя цена тепловой энергии.",
+            "В связи с тем, что здания отапливаются от различных источников энергии (видов топлива), перевод в объемы замещаемого энергоносителя и расчет денежной экономии производится индивидуально для каждого здания:",
         )
+        doc.add_paragraph()
+        
+        tbl_headers = [
+            "Наименование здания",
+            "Источник отопления",
+            "Теплотворность",
+            "Тариф за ед.",
+            "Экономия топлива",
+            "Экономия в год, тг"
+        ]
+        tbl_rows = []
+        for b in results["buildings"]:
+            b_meta = FUEL_META.get(b["fuel_type"], FUEL_META["gcal"])
+            cv_str = f"{fmt_num(b['fuel_calorific'], 4)} {b_meta['cv_unit']}" if b["fuel_type"] != "gcal" else "-"
+            tbl_rows.append((
+                b["name"],
+                b_meta["label_nom"],
+                cv_str,
+                f"{fmt_num(b['fuel_tariff'], 2)} {b_meta['tariff_unit']}",
+                f"{fmt_num(b['fuel_savings'], 2)} {b_meta['fuel_unit']}",
+                fmt_money(b["money_savings_tg"])
+            ))
+        
+        make_audit_table(
+            doc,
+            tbl_headers,
+            tbl_rows,
+            numeric_columns=[2, 3, 4, 5],
+            col_widths=[Cm(3.5), Cm(3.5), Cm(3.5), Cm(3), Cm(3), Cm(3.5)]
+        )
+        doc.add_paragraph()
 
     invest = results["investment"]
     add_body_paragraph(doc, "Стоимость затрат на внедрение мероприятия, тг:")

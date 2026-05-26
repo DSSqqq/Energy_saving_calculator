@@ -25,18 +25,6 @@ class BuildingInputSerializer(serializers.Serializer):
     t_outside_avg = serializers.FloatField(min_value=-60, max_value=20)
     r_before = serializers.FloatField(min_value=0.01, help_text="Сопротивление теплопередаче до, м²·°C/Вт")
     r_after = serializers.FloatField(min_value=0.01, help_text="Сопротивление теплопередаче после, м²·°C/Вт")
-
-    def validate(self, attrs):
-        if attrs["r_after"] <= attrs["r_before"]:
-            raise serializers.ValidationError(
-                {"r_after": "Сопротивление теплопередаче после мероприятия должно быть больше, чем до."}
-            )
-        return attrs
-
-
-class SharedParamsSerializer(serializers.Serializer):
-    """Общие константы расчёта и тарифы."""
-
     fuel_type = serializers.ChoiceField(
         choices=[
             ("gas", "Природный газ"),
@@ -49,6 +37,18 @@ class SharedParamsSerializer(serializers.Serializer):
     )
     fuel_tariff = serializers.FloatField(min_value=0.0)
     fuel_calorific = serializers.FloatField(min_value=0.00001)
+
+    def validate(self, attrs):
+        if attrs["r_after"] <= attrs["r_before"]:
+            raise serializers.ValidationError(
+                {"r_after": "Сопротивление теплопередаче после мероприятия должно быть больше, чем до."}
+            )
+        return attrs
+
+
+class SharedParamsSerializer(serializers.Serializer):
+    """Общие константы расчёта."""
+    pass
 
 
 class InvestmentItemSerializer(serializers.Serializer):

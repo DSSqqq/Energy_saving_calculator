@@ -19,6 +19,9 @@ const buildingABK: Building = {
   r_after: 0.51,
   g_inf_before: 15,
   g_inf_after: 3.5,
+  fuel_type: 'gas',
+  fuel_tariff: 49.9,
+  fuel_calorific: 8.19,
 }
 
 const buildingFactory: Building = {
@@ -32,14 +35,14 @@ const buildingFactory: Building = {
   r_after: 0.51,
   g_inf_before: 15,
   g_inf_after: 3.5,
+  fuel_type: 'gas',
+  fuel_tariff: 49.9,
+  fuel_calorific: 8.19,
 }
 
 const sharedDefaults: SharedParams = {
   c_air: 0.24,
   k_factor: 0.8,
-  fuel_type: 'gas',
-  fuel_tariff: 49.9,
-  fuel_calorific: 8.19,
 }
 
 const investmentDefaults: InvestmentItem[] = [
@@ -73,6 +76,9 @@ export function emptyBuilding(): Building {
     r_after: 0.51,
     g_inf_before: 15,
     g_inf_after: 3.5,
+    fuel_type: 'gas',
+    fuel_tariff: 49.9,
+    fuel_calorific: 8.19,
   }
 }
 

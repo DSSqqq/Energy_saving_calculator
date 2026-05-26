@@ -17,6 +17,9 @@ const buildingABK: Building = {
   t_outside_avg: -7.1,
   r_before: 0.75,
   r_after: 2.5,
+  fuel_type: 'gcal',
+  fuel_tariff: 6761.45,
+  fuel_calorific: 1.0,
 }
 
 const buildingFactory: Building = {
@@ -28,13 +31,12 @@ const buildingFactory: Building = {
   t_outside_avg: -10.0,
   r_before: 0.75,
   r_after: 2.5,
-}
-
-const sharedDefaults: SharedParams = {
   fuel_type: 'gcal',
   fuel_tariff: 6761.45,
   fuel_calorific: 1.0,
 }
+
+const sharedDefaults: SharedParams = {}
 
 const investmentDefaults: InvestmentItem[] = [
   { name: 'Утеплитель (минвата 100мм)', quantity: 1300, price_per_unit: 2500 },
@@ -64,6 +66,9 @@ export function emptyBuilding(): Building {
     t_outside_avg: -8,
     r_before: 0.75,
     r_after: 2.5,
+    fuel_type: 'gcal',
+    fuel_tariff: 6761.45,
+    fuel_calorific: 1.0,
   }
 }
 
