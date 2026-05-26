@@ -1,5 +1,5 @@
 type Props = {
-  onSelectView: (view: 'home' | 'templates' | 'windows' | 'tasks') => void
+  onSelectView: (view: 'home' | 'templates' | 'windows' | 'walls' | 'tasks') => void
 }
 
 export function HomePage({ onSelectView }: Props) {

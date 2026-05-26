@@ -1,5 +1,5 @@
 type Props = {
-  onSelectMeasure: (id: string) => void
+  onSelectMeasure: (id: 'home' | 'templates' | 'windows' | 'walls' | 'tasks') => void
 }
 
 export function TemplatesPage({ onSelectMeasure }: Props) {
@@ -16,7 +16,7 @@ export function TemplatesPage({ onSelectMeasure }: Props) {
           <h3 className="template-card__title">Мероприятие по ремонту оконных блоков</h3>
         </div>
 
-        <div className="template-card template-card--purple" onClick={() => alert('Мероприятие в разработке')} title="Мероприятие по улучшению теплозащитных свойств стен">
+        <div className="template-card template-card--purple" onClick={() => onSelectMeasure('walls')} title="Мероприятие по улучшению теплозащитных свойств стен">
           <div className="template-card__icon">🧱</div>
           <h3 className="template-card__title">Мероприятие по улучшению теплозащитных свойств стен</h3>
         </div>
