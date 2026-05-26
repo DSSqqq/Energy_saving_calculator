@@ -1,64 +1,133 @@
 /**
- * Корневой компонент мероприятия «Стены».
- * Страница-заглушка — структура идентична «Окнам», наполнение будет добавлено позже.
+ * Корневой компонент мероприятия «Стены»: компонует все формы, делает запросы
+ * на /api/measures/walls/calculate и /api/measures/walls/export.
  */
+import { useState } from 'react'
+
+import { BuildingsList } from './BuildingsList'
+import { InvestmentTable } from './InvestmentTable'
+import { ResultsPanel } from './ResultsPanel'
+import { SharedParamsForm } from './SharedParamsForm'
+import { DEFAULT_INPUT } from './defaults'
+import type { CalculateResponse, WallsInput } from './types'
+
+const API_BASE = '/api/measures/walls'
 
 export function WallsMeasure() {
+  const [input, setInput] = useState<WallsInput>(DEFAULT_INPUT)
+  const [result, setResult] = useState<CalculateResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState<'idle' | 'calc' | 'export'>('idle')
+
+  async function calculate() {
+    setError(null)
+    setLoading('calc')
+    try {
+      const res = await fetch(`${API_BASE}/calculate/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(JSON.stringify(data, null, 2))
+        setResult(null)
+        return
+      }
+      setResult(data as CalculateResponse)
+    } catch {
+      setError('Не удалось связаться с сервером. Запущен ли Django на :8000?')
+    } finally {
+      setLoading('idle')
+    }
+  }
+
+  async function exportDocx() {
+    setError(null)
+    setLoading('export')
+    try {
+      const res = await fetch(`${API_BASE}/export/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(JSON.stringify(data, null, 2))
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'walls_thermal_insulation.docx'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setError('Не удалось получить .docx с сервера.')
+    } finally {
+      setLoading('idle')
+    }
+  }
+
   return (
     <main className="app">
       <header className="app__header">
         <h1><span className="title-icon">🧱</span>Мероприятие по улучшению теплозащитных свойств стен</h1>
       </header>
 
-      {/* Блок: Здания */}
-      <section className="block">
-        <header className="block__header">
-          <h2><span className="title-icon">🏢</span>Здания</h2>
-          <button type="button" className="btn btn--ghost" disabled>
-            + Добавить здание
-          </button>
-        </header>
-        <div className="buildings">
-          <div style={{ padding: '1.5rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            В разработке…
-          </div>
-        </div>
-      </section>
+      <BuildingsList
+        buildings={input.buildings}
+        onChange={(buildings) => {
+          const totalArea = buildings.reduce((s, b) => s + (b.area_m2 || 0), 0)
+          const investment_items = input.investment_items.map((it) => ({
+            ...it,
+            quantity: totalArea,
+          }))
+          setInput({ ...input, buildings, investment_items })
+        }}
+      />
 
-      {/* Блок: Общие параметры */}
-      <section className="block">
-        <header className="block__header">
-          <h2><span className="title-icon">⚙️</span>Общие параметры расчёта</h2>
-        </header>
-        <div className="grid">
-          <div style={{ padding: '1rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            В разработке…
-          </div>
-        </div>
-      </section>
+      <SharedParamsForm
+        shared={input.shared}
+        finance={input.finance}
+        onSharedChange={(shared) => setInput({ ...input, shared })}
+        onFinanceChange={(finance) => setInput({ ...input, finance })}
+      />
 
-      {/* Блок: Смета */}
-      <section className="block">
-        <header className="block__header">
-          <h2><span className="title-icon">💰</span>Смета</h2>
-          <button type="button" className="btn btn--ghost" disabled>
-            + Добавить строку
-          </button>
-        </header>
-        <div style={{ padding: '1rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-          В разработке…
-        </div>
-      </section>
+      <InvestmentTable
+        items={input.investment_items}
+        onChange={(items) => setInput({ ...input, investment_items: items })}
+      />
 
-      {/* Кнопки действий */}
       <section className="actions">
-        <button type="button" className="btn btn--primary" disabled>
-          Рассчитать
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={calculate}
+          disabled={loading !== 'idle'}
+        >
+          {loading === 'calc' ? 'Считаем…' : 'Рассчитать'}
         </button>
-        <button type="button" className="btn" disabled>
-          Скачать .docx
+        <button
+          type="button"
+          className="btn"
+          onClick={exportDocx}
+          disabled={loading !== 'idle'}
+        >
+          {loading === 'export' ? 'Готовим .docx…' : 'Скачать .docx'}
         </button>
       </section>
+
+      {error && (
+        <pre className="panel panel--error" role="alert">
+          {error}
+        </pre>
+      )}
+
+      {result && <ResultsPanel result={result} />}
     </main>
   )
 }
