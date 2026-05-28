@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 type TaskStatus = '' | 'К выполнению' | 'В работе' | 'Готово'
 
@@ -12,24 +12,63 @@ type Task = {
 export function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
 
+  useEffect(() => {
+    fetch('/api/tasks/')
+      .then((res) => {
+        if (!res.ok) throw new Error('Network response was not ok')
+        return res.json()
+      })
+      .then((data) => setTasks(data as Task[]))
+      .catch((err) => console.error('Failed to load tasks:', err))
+  }, [])
+
   const addTask = () => {
-    setTasks([
-      ...tasks,
-      {
-        id: crypto.randomUUID(),
-        title: '',
-        assignee: '',
-        status: '',
-      },
-    ])
+    const newTask = {
+      title: '',
+      assignee: '',
+      status: '',
+    }
+    fetch('/api/tasks/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTask),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to create task')
+        return res.json()
+      })
+      .then((savedTask: Task) => {
+        setTasks((prev) => [...prev, savedTask])
+      })
+      .catch((err) => console.error('Failed to add task:', err))
   }
 
   const updateTask = (id: string, updates: Partial<Task>) => {
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+    // Optimistic UI update
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+
+    fetch(`/api/tasks/${id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to update task')
+      })
+      .catch((err) => console.error('Failed to update task:', err))
   }
 
   const removeTask = (id: string) => {
-    setTasks(tasks.filter((t) => t.id !== id))
+    // Optimistic UI update
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+
+    fetch(`/api/tasks/${id}/`, {
+      method: 'DELETE',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to delete task')
+      })
+      .catch((err) => console.error('Failed to delete task:', err))
   }
 
   return (

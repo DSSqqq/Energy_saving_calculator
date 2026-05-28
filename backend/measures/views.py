@@ -14,8 +14,11 @@ from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 
 from .registry import get_measure, list_measures
+from .models import Task
+from .serializers import TaskSerializer
 
 
 class MeasuresListView(APIView):
@@ -75,3 +78,10 @@ class MeasureExportDocxView(APIView):
             f'attachment; filename="{measure.docx_filename}"'
         )
         return response
+
+
+class TaskViewSet(ModelViewSet):
+    """ViewSet для полноценного управления задачами (CRUD)."""
+
+    queryset = Task.objects.all().order_by("id")
+    serializer_class = TaskSerializer
