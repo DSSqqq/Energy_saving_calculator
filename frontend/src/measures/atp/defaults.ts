@@ -1,4 +1,4 @@
-import { ATPInput, Building } from './types'
+import type { ATPInput, Building } from './types'
 
 export const emptyBuilding = (): Building => ({
   name: 'Новый объект',
