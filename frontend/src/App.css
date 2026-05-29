@@ -376,7 +376,7 @@
 /* Стили для страницы шаблонов */
 .templates-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   grid-auto-rows: 240px;
   gap: 1.5rem;
   margin-top: 2rem;
@@ -410,6 +410,10 @@
 
 .template-card--yellow {
   background-color: rgba(227, 178, 60, 0.8); /* warm yellow/mustard with transparency */
+}
+
+.template-card--green {
+  background-color: rgba(46, 125, 50, 0.8); /* vibrant green with transparency */
 }
 
 .template-card:hover {
