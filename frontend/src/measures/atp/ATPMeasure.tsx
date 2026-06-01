@@ -4,7 +4,7 @@ import { BuildingsList } from './BuildingsList'
 import { ResultsPanel } from './ResultsPanel'
 import { SharedParamsForm } from './SharedParamsForm'
 import { DEFAULT_ATP_INPUT } from './defaults'
-import type { CalculateResponse, ATPInput } from './types'
+import type { CalculateResponse, ATPInput, Building } from './types'
 
 const API_BASE = '/api/measures/atp'
 
@@ -15,71 +15,51 @@ export function ATPMeasure() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<'idle' | 'calc' | 'export'>('idle')
 
-  function handleModeChange(mode: 'single' | 'multi') {
-    setInputMode(mode)
-    if (mode === 'single') {
-      // Сворачиваем в одно здание: суммируем нагрузки и инвестиции
-      if (input.buildings.length > 1) {
-        const totalQ = input.buildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
-        const totalInvest = input.buildings.reduce((sum, b) => sum + (b.investment || 0), 0)
-        const first = input.buildings[0]
+  const totalQ = input.buildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
+
+  function handleTotalQChange(newTotal: number) {
+    if (newTotal <= 0) return
+    const oldTotal = totalQ
+    if (oldTotal <= 0) {
+      const val = newTotal / input.buildings.length
+      setInput({
+        ...input,
+        buildings: input.buildings.map((b) => ({ ...b, q_annual: val })),
+      })
+    } else {
+      const factor = newTotal / oldTotal
+      setInput({
+        ...input,
+        buildings: input.buildings.map((b) => ({
+          ...b,
+          q_annual: (b.q_annual || 0) * factor,
+        })),
+      })
+    }
+  }
+
+  function handleBuildingsChange(newBuildings: Building[]) {
+    if (inputMode === 'single') {
+      const targetTotal = totalQ
+      const newSum = newBuildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
+      if (newSum > 0) {
+        const factor = targetTotal / newSum
         setInput({
           ...input,
-          buildings: [
-            {
-              ...first,
-              name: 'Момышулы, 23 (Весь объект)',
-              q_annual: totalQ,
-              investment: totalInvest,
-            },
-          ],
+          buildings: newBuildings.map((b) => ({
+            ...b,
+            q_annual: (b.q_annual || 0) * factor,
+          })),
         })
-      } else if (input.buildings.length === 1) {
+      } else {
+        const val = targetTotal / newBuildings.length
         setInput({
           ...input,
-          buildings: [
-            {
-              ...input.buildings[0],
-              name: 'Момышулы, 23 (Весь объект)',
-            },
-          ],
+          buildings: newBuildings.map((b) => ({ ...b, q_annual: val })),
         })
       }
     } else {
-      // Разворачиваем: если было одно сводное здание "Момышулы, 23 (Весь объект)", восстанавливаем дефолтные два здания
-      if (input.buildings.length === 1 && input.buildings[0].name === 'Момышулы, 23 (Весь объект)') {
-        setInput({
-          ...input,
-          buildings: [
-            {
-              name: 'Момышулы, 23 (АБК)',
-              q_annual: 886.6,
-              t_inside: 21.0,
-              t_standby: 18.0,
-              t_outside_avg: -6.8,
-              t_outside_design: -32.8,
-              period_days: 205,
-              weekend_days: 41,
-              day_hours: 10,
-              fuel_tariff: 13289.77,
-              investment: 4000000,
-            },
-            {
-              name: 'Момышулы, 23 (Второй объект)',
-              q_annual: 222.596,
-              t_inside: 21.0,
-              t_standby: 18.0,
-              t_outside_avg: -6.8,
-              t_outside_design: -32.8,
-              period_days: 205,
-              weekend_days: 41,
-              day_hours: 10,
-              fuel_tariff: 13289.77,
-              investment: 3500000,
-            },
-          ],
-        })
-      }
+      setInput({ ...input, buildings: newBuildings })
     }
   }
 
@@ -136,24 +116,6 @@ export function ATPMeasure() {
     }
   }
 
-  // При первой инициализации, если дефолтные два здания, свернем их в одно в соответствии с single по умолчанию
-  if (inputMode === 'single' && input.buildings.length > 1) {
-    const totalQ = input.buildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
-    const totalInvest = input.buildings.reduce((sum, b) => sum + (b.investment || 0), 0)
-    const first = input.buildings[0]
-    setInput({
-      ...input,
-      buildings: [
-        {
-          ...first,
-          name: 'Момышулы, 23 (Весь объект)',
-          q_annual: totalQ,
-          investment: totalInvest,
-        },
-      ],
-    })
-  }
-
   return (
     <main className="app">
       <header className="app__header">
@@ -171,12 +133,12 @@ export function ATPMeasure() {
         </header>
         <div className="grid">
           <div className="field">
-            <span>Тип детализации объекта</span>
+            <span>Режим ввода потребления</span>
             <div className="input-mode-selector" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
               <button
                 type="button"
                 className={`btn ${inputMode === 'single' ? 'btn--primary' : 'btn--ghost'}`}
-                onClick={() => handleModeChange('single')}
+                onClick={() => setInputMode('single')}
                 style={{ flex: 1 }}
               >
                 Для всего объекта целиком
@@ -184,7 +146,7 @@ export function ATPMeasure() {
               <button
                 type="button"
                 className={`btn ${inputMode === 'multi' ? 'btn--primary' : 'btn--ghost'}`}
-                onClick={() => handleModeChange('multi')}
+                onClick={() => setInputMode('multi')}
                 style={{ flex: 1 }}
               >
                 Для каждого здания отдельно
@@ -197,14 +159,8 @@ export function ATPMeasure() {
               <span>Годовая тепловая нагрузка на систему отопления, Гкал/год</span>
               <input
                 type="number"
-                value={Number.isFinite(input.buildings[0]?.q_annual) ? input.buildings[0].q_annual : ''}
-                onChange={(e) => {
-                  const val = Number(e.target.value)
-                  setInput({
-                    ...input,
-                    buildings: input.buildings.map((b, i) => (i === 0 ? { ...b, q_annual: val } : b)),
-                  })
-                }}
+                value={Number.isFinite(totalQ) ? Number(totalQ.toFixed(4)) : ''}
+                onChange={(e) => handleTotalQChange(Number(e.target.value))}
                 step="any"
                 min={0.01}
                 style={{ marginTop: '0.5rem' }}
@@ -223,7 +179,7 @@ export function ATPMeasure() {
 
       <BuildingsList
         buildings={input.buildings}
-        onChange={(buildings) => setInput({ ...input, buildings })}
+        onChange={handleBuildingsChange}
         mode={inputMode}
       />
 

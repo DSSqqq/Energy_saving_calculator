@@ -24,14 +24,11 @@ export function BuildingsList({ buildings, onChange, mode }: Props) {
     <section className="block">
       <header className="block__header">
         <h2>
-          <span className="title-icon">🏢</span>
-          {mode === 'single' ? 'Параметры теплового пункта всего объекта' : 'Здания и тепловые нагрузки'}
+          <span className="title-icon">🏢</span>Здания и тепловые нагрузки
         </h2>
-        {mode === 'multi' && (
-          <button type="button" className="btn btn--ghost" onClick={add}>
-            + Добавить здание
-          </button>
-        )}
+        <button type="button" className="btn btn--ghost" onClick={add}>
+          + Добавить здание
+        </button>
       </header>
       <div className="buildings">
         {buildings.map((b, idx) => {
@@ -39,40 +36,37 @@ export function BuildingsList({ buildings, onChange, mode }: Props) {
             <article key={idx} className="building">
               <div className="building__top">
                 <label className="field">
-                  <span>Наименование {mode === 'single' ? 'объекта' : 'здания / объекта'}</span>
+                  <span>Наименование здания / объекта</span>
                   <input
                     type="text"
                     value={b.name}
                     onChange={(e) => update(idx, { name: e.target.value })}
-                    placeholder={mode === 'single' ? 'Например, Весь объект' : 'Например, АБК'}
+                    placeholder="Например, АБК"
                   />
                 </label>
-                {mode === 'multi' && (
-                  <button
-                    type="button"
-                    className="btn btn--danger"
-                    onClick={() => {
-                      if (window.confirm('Вы уверены, что хотите удалить это здание?')) {
-                        remove(idx)
-                      }
-                    }}
-                    disabled={buildings.length === 1}
-                    title={buildings.length === 1 ? 'Нужно хотя бы одно здание' : 'Удалить'}
-                  >
-                    Удалить
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={() => {
+                    if (window.confirm('Вы уверены, что хотите удалить это здание?')) {
+                      remove(idx)
+                    }
+                  }}
+                  disabled={buildings.length === 1}
+                  title={buildings.length === 1 ? 'Нужно хотя бы одно здание' : 'Удалить'}
+                >
+                  Удалить
+                </button>
               </div>
               <div className="grid">
-                {mode === 'multi' && (
-                  <NumberField
-                    label="Базовое теплопотребление, Гкал/год"
-                    value={b.q_annual}
-                    onChange={(v) => update(idx, { q_annual: v })}
-                    step={0.01}
-                    min={0.01}
-                  />
-                )}
+                <NumberField
+                  label={mode === 'single' ? 'Потребление (распределено), Гкал/год' : 'Базовое теплопотребление, Гкал/год'}
+                  value={b.q_annual}
+                  onChange={(v) => update(idx, { q_annual: v })}
+                  step={0.01}
+                  min={0.01}
+                  readOnly={mode === 'single'}
+                />
                 <NumberField
                   label="Внутренняя t (рабочая), °C"
                   value={b.t_inside}
@@ -127,7 +121,7 @@ export function BuildingsList({ buildings, onChange, mode }: Props) {
                   min={0}
                 />
                 <NumberField
-                  label={mode === 'single' ? 'Затраты на АТП всего объекта, тг' : 'Затраты на АТП для здания, тг'}
+                  label="Затраты на АТП для здания, тг"
                   value={b.investment}
                   onChange={(v) => update(idx, { investment: v })}
                   step={1000}
@@ -149,6 +143,7 @@ function NumberField({
   step,
   min,
   max,
+  readOnly,
 }: {
   label: string
   value: number
@@ -156,6 +151,7 @@ function NumberField({
   step?: number
   min?: number
   max?: number
+  readOnly?: boolean
 }) {
   return (
     <label className="field">
@@ -167,6 +163,18 @@ function NumberField({
         step={step ?? 'any'}
         min={min}
         max={max}
+        readOnly={readOnly}
+        disabled={readOnly}
+        style={
+          readOnly
+            ? {
+                opacity: 0.8,
+                backgroundColor: 'rgba(255,255,255,0.03)',
+                cursor: 'not-allowed',
+                borderStyle: 'dashed',
+              }
+            : undefined
+        }
       />
     </label>
   )
