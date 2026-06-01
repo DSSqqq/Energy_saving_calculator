@@ -4,9 +4,10 @@ import { emptyBuilding } from './defaults'
 type Props = {
   buildings: Building[]
   onChange: (next: Building[]) => void
+  mode: 'single' | 'multi'
 }
 
-export function BuildingsList({ buildings, onChange }: Props) {
+export function BuildingsList({ buildings, onChange, mode }: Props) {
   function update(idx: number, patch: Partial<Building>) {
     onChange(buildings.map((b, i) => (i === idx ? { ...b, ...patch } : b)))
   }
@@ -23,11 +24,14 @@ export function BuildingsList({ buildings, onChange }: Props) {
     <section className="block">
       <header className="block__header">
         <h2>
-          <span className="title-icon">🏢</span>Здания и тепловые нагрузки
+          <span className="title-icon">🏢</span>
+          {mode === 'single' ? 'Параметры теплового пункта всего объекта' : 'Здания и тепловые нагрузки'}
         </h2>
-        <button type="button" className="btn btn--ghost" onClick={add}>
-          + Добавить здание
-        </button>
+        {mode === 'multi' && (
+          <button type="button" className="btn btn--ghost" onClick={add}>
+            + Добавить здание
+          </button>
+        )}
       </header>
       <div className="buildings">
         {buildings.map((b, idx) => {
@@ -35,36 +39,40 @@ export function BuildingsList({ buildings, onChange }: Props) {
             <article key={idx} className="building">
               <div className="building__top">
                 <label className="field">
-                  <span>Наименование здания / объекта</span>
+                  <span>Наименование {mode === 'single' ? 'объекта' : 'здания / объекта'}</span>
                   <input
                     type="text"
                     value={b.name}
                     onChange={(e) => update(idx, { name: e.target.value })}
-                    placeholder="Например, АБК"
+                    placeholder={mode === 'single' ? 'Например, Весь объект' : 'Например, АБК'}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  onClick={() => {
-                    if (window.confirm('Вы уверены, что хотите удалить это здание?')) {
-                      remove(idx)
-                    }
-                  }}
-                  disabled={buildings.length === 1}
-                  title={buildings.length === 1 ? 'Нужно хотя бы одно здание' : 'Удалить'}
-                >
-                  Удалить
-                </button>
+                {mode === 'multi' && (
+                  <button
+                    type="button"
+                    className="btn btn--danger"
+                    onClick={() => {
+                      if (window.confirm('Вы уверены, что хотите удалить это здание?')) {
+                        remove(idx)
+                      }
+                    }}
+                    disabled={buildings.length === 1}
+                    title={buildings.length === 1 ? 'Нужно хотя бы одно здание' : 'Удалить'}
+                  >
+                    Удалить
+                  </button>
+                )}
               </div>
               <div className="grid">
-                <NumberField
-                  label="Базовое теплопотребление, Гкал/год"
-                  value={b.q_annual}
-                  onChange={(v) => update(idx, { q_annual: v })}
-                  step={0.01}
-                  min={0.01}
-                />
+                {mode === 'multi' && (
+                  <NumberField
+                    label="Базовое теплопотребление, Гкал/год"
+                    value={b.q_annual}
+                    onChange={(v) => update(idx, { q_annual: v })}
+                    step={0.01}
+                    min={0.01}
+                  />
+                )}
                 <NumberField
                   label="Внутренняя t (рабочая), °C"
                   value={b.t_inside}
@@ -119,7 +127,7 @@ export function BuildingsList({ buildings, onChange }: Props) {
                   min={0}
                 />
                 <NumberField
-                  label="Затраты на АТП для здания, тг"
+                  label={mode === 'single' ? 'Затраты на АТП всего объекта, тг' : 'Затраты на АТП для здания, тг'}
                   value={b.investment}
                   onChange={(v) => update(idx, { investment: v })}
                   step={1000}

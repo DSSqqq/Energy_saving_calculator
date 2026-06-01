@@ -10,9 +10,78 @@ const API_BASE = '/api/measures/atp'
 
 export function ATPMeasure() {
   const [input, setInput] = useState<ATPInput>(DEFAULT_ATP_INPUT)
+  const [inputMode, setInputMode] = useState<'single' | 'multi'>('single')
   const [result, setResult] = useState<CalculateResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<'idle' | 'calc' | 'export'>('idle')
+
+  function handleModeChange(mode: 'single' | 'multi') {
+    setInputMode(mode)
+    if (mode === 'single') {
+      // Сворачиваем в одно здание: суммируем нагрузки и инвестиции
+      if (input.buildings.length > 1) {
+        const totalQ = input.buildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
+        const totalInvest = input.buildings.reduce((sum, b) => sum + (b.investment || 0), 0)
+        const first = input.buildings[0]
+        setInput({
+          ...input,
+          buildings: [
+            {
+              ...first,
+              name: 'Момышулы, 23 (Весь объект)',
+              q_annual: totalQ,
+              investment: totalInvest,
+            },
+          ],
+        })
+      } else if (input.buildings.length === 1) {
+        setInput({
+          ...input,
+          buildings: [
+            {
+              ...input.buildings[0],
+              name: 'Момышулы, 23 (Весь объект)',
+            },
+          ],
+        })
+      }
+    } else {
+      // Разворачиваем: если было одно сводное здание "Момышулы, 23 (Весь объект)", восстанавливаем дефолтные два здания
+      if (input.buildings.length === 1 && input.buildings[0].name === 'Момышулы, 23 (Весь объект)') {
+        setInput({
+          ...input,
+          buildings: [
+            {
+              name: 'Момышулы, 23 (АБК)',
+              q_annual: 886.6,
+              t_inside: 21.0,
+              t_standby: 18.0,
+              t_outside_avg: -6.8,
+              t_outside_design: -32.8,
+              period_days: 205,
+              weekend_days: 41,
+              day_hours: 10,
+              fuel_tariff: 13289.77,
+              investment: 4000000,
+            },
+            {
+              name: 'Момышулы, 23 (Второй объект)',
+              q_annual: 222.596,
+              t_inside: 21.0,
+              t_standby: 18.0,
+              t_outside_avg: -6.8,
+              t_outside_design: -32.8,
+              period_days: 205,
+              weekend_days: 41,
+              day_hours: 10,
+              fuel_tariff: 13289.77,
+              investment: 3500000,
+            },
+          ],
+        })
+      }
+    }
+  }
 
   async function calculate() {
     setError(null)
@@ -67,6 +136,24 @@ export function ATPMeasure() {
     }
   }
 
+  // При первой инициализации, если дефолтные два здания, свернем их в одно в соответствии с single по умолчанию
+  if (inputMode === 'single' && input.buildings.length > 1) {
+    const totalQ = input.buildings.reduce((sum, b) => sum + (b.q_annual || 0), 0)
+    const totalInvest = input.buildings.reduce((sum, b) => sum + (b.investment || 0), 0)
+    const first = input.buildings[0]
+    setInput({
+      ...input,
+      buildings: [
+        {
+          ...first,
+          name: 'Момышулы, 23 (Весь объект)',
+          q_annual: totalQ,
+          investment: totalInvest,
+        },
+      ],
+    })
+  }
+
   return (
     <main className="app">
       <header className="app__header">
@@ -75,9 +162,69 @@ export function ATPMeasure() {
         </h1>
       </header>
 
+      {/* Выбор режима расчёта и общая нагрузка */}
+      <section className="block">
+        <header className="block__header">
+          <h2>
+            <span className="title-icon">⚙️</span>Режим расчета и общая нагрузка
+          </h2>
+        </header>
+        <div className="grid">
+          <div className="field">
+            <span>Тип детализации объекта</span>
+            <div className="input-mode-selector" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className={`btn ${inputMode === 'single' ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => handleModeChange('single')}
+                style={{ flex: 1 }}
+              >
+                Для всего объекта целиком
+              </button>
+              <button
+                type="button"
+                className={`btn ${inputMode === 'multi' ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => handleModeChange('multi')}
+                style={{ flex: 1 }}
+              >
+                Для каждого здания отдельно
+              </button>
+            </div>
+          </div>
+
+          {inputMode === 'single' ? (
+            <label className="field">
+              <span>Годовая тепловая нагрузка на систему отопления, Гкал/год</span>
+              <input
+                type="number"
+                value={Number.isFinite(input.buildings[0]?.q_annual) ? input.buildings[0].q_annual : ''}
+                onChange={(e) => {
+                  const val = Number(e.target.value)
+                  setInput({
+                    ...input,
+                    buildings: input.buildings.map((b, i) => (i === 0 ? { ...b, q_annual: val } : b)),
+                  })
+                }}
+                step="any"
+                min={0.01}
+                style={{ marginTop: '0.5rem' }}
+                placeholder="Общее потребление Гкал всех зданий"
+              />
+            </label>
+          ) : (
+            <div className="field" style={{ display: 'flex', alignItems: 'center', opacity: 0.6 }}>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                ℹ️ Годовое теплопотребление настраивается отдельно для каждого здания в блоке ниже.
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
+
       <BuildingsList
         buildings={input.buildings}
         onChange={(buildings) => setInput({ ...input, buildings })}
+        mode={inputMode}
       />
 
       <SharedParamsForm
