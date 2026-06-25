@@ -7,12 +7,14 @@
 from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import SimpleRouter
-from measures.views import TaskViewSet, GeoObjectViewSet, BuildingViewSet
+from measures.views import TaskViewSet, GeoObjectViewSet, BuildingViewSet, WindowViewSet, DoorViewSet
 
 router = SimpleRouter()
 router.register(r'tasks', TaskViewSet, basename='task')
 router.register(r'objects', GeoObjectViewSet, basename='geoobject')
 router.register(r'buildings', BuildingViewSet, basename='building')
+router.register(r'windows', WindowViewSet, basename='window')
+router.register(r'doors', DoorViewSet, basename='door')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

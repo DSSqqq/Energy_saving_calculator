@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task, GeoObject, Building
+from .models import Task, GeoObject, Building, Window, Door
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,4 +16,16 @@ class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Building
         fields = ['id', 'object', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+class WindowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Window
+        fields = ['id', 'building', 'height', 'width', 'orientation', 'material', 'glazing', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+class DoorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Door
+        fields = ['id', 'building', 'height', 'width', 'orientation', 'material', 'created_at']
         read_only_fields = ['id', 'created_at']

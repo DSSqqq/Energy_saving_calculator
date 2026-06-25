@@ -16,9 +16,10 @@ interface Building {
 interface ObjectDetailsPageProps {
   objectId: number;
   onBack: () => void;
+  onOpenBuilding: (buildingId: number) => void;
 }
 
-export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) {
+export function ObjectDetailsPage({ objectId, onBack, onOpenBuilding }: ObjectDetailsPageProps) {
   const cachedObject = ((window as any).__objectCache || {})[objectId];
   const [objectInfo, setObjectInfo] = useState<GeoObject | null>(cachedObject || null);
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -160,8 +161,8 @@ export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) 
     }
   };
 
-  const handleBuildingClick = (bldName: string) => {
-    alert(`Переход к расчету здания "${bldName}" в разработке...`);
+  const handleBuildingClick = (bldId: number) => {
+    onOpenBuilding(bldId);
   };
 
   return (
@@ -267,7 +268,7 @@ export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) 
                   </thead>
                   <tbody>
                     {buildings.map((bld) => (
-                      <tr key={bld.id} style={{ cursor: 'pointer' }} onClick={() => handleBuildingClick(bld.name)}>
+                      <tr key={bld.id} style={{ cursor: 'pointer' }} onClick={() => handleBuildingClick(bld.id)}>
                         <td style={{ fontWeight: 600, color: '#ffffff' }}>
                           🏢 {bld.name}
                         </td>
@@ -291,7 +292,7 @@ export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) 
                                 className="action-dropdown__item" 
                                 onClick={() => {
                                   setActiveDropdownId(null);
-                                  handleBuildingClick(bld.name);
+                                  handleBuildingClick(bld.id);
                                 }}
                               >
                                 Войти

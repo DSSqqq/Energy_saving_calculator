@@ -17,8 +17,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from .registry import get_measure, list_measures
-from .models import Task, GeoObject, Building
-from .serializers import TaskSerializer, GeoObjectSerializer, BuildingSerializer
+from .models import Task, GeoObject, Building, Window, Door
+from .serializers import TaskSerializer, GeoObjectSerializer, BuildingSerializer, WindowSerializer, DoorSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 
@@ -132,4 +132,38 @@ class BuildingViewSet(ModelViewSet):
         object_val = serializer.validated_data.get('object')
         if object_val.user != self.request.user:
             raise PermissionDenied("У вас нет прав для добавления здания в этот объект.")
+        serializer.save()
+
+class WindowViewSet(ModelViewSet):
+    serializer_class = WindowSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        building_id = self.request.query_params.get('building')
+        queryset = Window.objects.filter(building__object__user=self.request.user)
+        if building_id:
+            queryset = queryset.filter(building_id=building_id)
+        return queryset.order_by('id')
+
+    def perform_create(self, serializer):
+        building = serializer.validated_data.get('building')
+        if building.object.user != self.request.user:
+            raise PermissionDenied("У вас нет прав для добавления окна в это здание.")
+        serializer.save()
+
+class DoorViewSet(ModelViewSet):
+    serializer_class = DoorSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        building_id = self.request.query_params.get('building')
+        queryset = Door.objects.filter(building__object__user=self.request.user)
+        if building_id:
+            queryset = queryset.filter(building_id=building_id)
+        return queryset.order_by('id')
+
+    def perform_create(self, serializer):
+        building = serializer.validated_data.get('building')
+        if building.object.user != self.request.user:
+            raise PermissionDenied("У вас нет прав для добавления двери в это здание.")
         serializer.save()

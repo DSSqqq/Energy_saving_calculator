@@ -16,6 +16,7 @@ import { AuthPage } from './AuthPage'
 import { UsersPage } from './UsersPage'
 import { GeoObjectsPage } from './GeoObjectsPage'
 import { ObjectDetailsPage } from './ObjectDetailsPage'
+import { BuildingDetailsPage } from './BuildingDetailsPage'
 
 function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
@@ -31,10 +32,23 @@ function App() {
     return null
   }
 
+  const getInitialBuildingId = (): number | null => {
+    const hash = window.location.hash
+    if (hash.startsWith('#/objects/')) {
+      const parts = hash.split('/')
+      if (parts[3] === 'buildings') {
+        const id = parseInt(parts[4], 10)
+        return isNaN(id) ? null : id
+      }
+    }
+    return null
+  }
+
   const [selectedObjectId, setSelectedObjectId] = useState<number | null>(getInitialObjectId)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(getInitialBuildingId)
 
   // Helper to determine initial view based on URL hash
-  const getInitialView = (): 'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' | 'atp' | 'users' | 'geo_objects' | 'object_details' => {
+  const getInitialView = (): 'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' | 'atp' | 'users' | 'geo_objects' | 'object_details' | 'building_details' => {
     const hash = window.location.hash
     if (hash === '#/templates') return 'templates'
     if (hash === '#/windows') return 'windows'
@@ -45,11 +59,17 @@ function App() {
     if (hash === '#/atp') return 'atp'
     if (hash === '#/users') return 'users'
     if (hash === '#/objects') return 'geo_objects'
-    if (hash.startsWith('#/objects/')) return 'object_details'
+    if (hash.startsWith('#/objects/')) {
+      const parts = hash.split('/')
+      if (parts[3] === 'buildings') {
+        return 'building_details'
+      }
+      return 'object_details'
+    }
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' | 'atp' | 'users' | 'geo_objects' | 'object_details'>(getInitialView)
+  const [currentView, setCurrentView] = useState<'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' | 'atp' | 'users' | 'geo_objects' | 'object_details' | 'building_details'>(getInitialView)
 
   const handleLoginSuccess = (newToken: string, newUsername: string) => {
     localStorage.setItem('token', newToken)
@@ -88,12 +108,13 @@ function App() {
       users: '#/users',
       geo_objects: '#/objects',
       object_details: `#/objects/${selectedObjectId}`,
+      building_details: `#/objects/${selectedObjectId}/buildings/${selectedBuildingId}`,
     }
     const target = hashMap[currentView] ?? '#/'
     if (window.location.hash !== target) {
       window.location.hash = target
     }
-  }, [currentView, selectedObjectId])
+  }, [currentView, selectedObjectId, selectedBuildingId])
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -110,10 +131,18 @@ function App() {
       else if (hash === '#/objects') setCurrentView('geo_objects')
       else if (hash.startsWith('#/objects/')) {
         const parts = hash.split('/')
-        const id = parseInt(parts[2], 10)
-        if (!isNaN(id)) {
-          setSelectedObjectId(id)
-          setCurrentView('object_details')
+        const objId = parseInt(parts[2], 10)
+        if (!isNaN(objId)) {
+          setSelectedObjectId(objId)
+          if (parts[3] === 'buildings') {
+            const bldId = parseInt(parts[4], 10)
+            if (!isNaN(bldId)) {
+              setSelectedBuildingId(bldId)
+              setCurrentView('building_details')
+            }
+          } else {
+            setCurrentView('object_details')
+          }
         }
       }
       else if (hash === '#/' || hash === '') setCurrentView('home')
@@ -213,6 +242,18 @@ function App() {
           <ObjectDetailsPage 
             objectId={selectedObjectId} 
             onBack={() => setCurrentView('geo_objects')} 
+            onOpenBuilding={(bldId) => {
+              setSelectedBuildingId(bldId)
+              setCurrentView('building_details')
+            }}
+          />
+        ) : null
+      ) : currentView === 'building_details' ? (
+        selectedObjectId !== null && selectedBuildingId !== null ? (
+          <BuildingDetailsPage 
+            buildingId={selectedBuildingId} 
+            objectId={selectedObjectId}
+            onBack={() => setCurrentView('object_details')} 
           />
         ) : null
       ) : null}

@@ -51,3 +51,74 @@ class Building(models.Model):
 
     def __str__(self):
         return self.name
+
+class Window(models.Model):
+    ORIENTATION_CHOICES = [
+        ("Север", "Север"),
+        ("Юг", "Юг"),
+        ("Восток", "Восток"),
+        ("Запад", "Запад"),
+        ("Северо-Восток", "Северо-Восток"),
+        ("Северо-Запад", "Северо-Запад"),
+        ("Юго-Восток", "Юго-Восток"),
+        ("Юго-Запад", "Юго-Запад"),
+    ]
+    MATERIAL_CHOICES = [
+        ("ПВХ", "ПВХ"),
+        ("Дерево", "Дерево"),
+        ("Алюминий", "Алюминий"),
+    ]
+    GLAZING_CHOICES = [
+        ("Одинарное", "Одинарное"),
+        ("Двойное", "Двойное"),
+        ("Тройное", "Тройное"),
+        ("Двойное энергосберегающее", "Двойное энергосберегающее"),
+    ]
+
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="windows"
+    )
+    height = models.FloatField()
+    width = models.FloatField()
+    orientation = models.CharField(max_length=50, choices=ORIENTATION_CHOICES)
+    material = models.CharField(max_length=50, choices=MATERIAL_CHOICES)
+    glazing = models.CharField(max_length=50, choices=GLAZING_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Окно ({self.orientation}, {self.width}x{self.height})"
+
+class Door(models.Model):
+    ORIENTATION_CHOICES = [
+        ("Север", "Север"),
+        ("Юг", "Юг"),
+        ("Восток", "Восток"),
+        ("Запад", "Запад"),
+        ("Северо-Восток", "Северо-Восток"),
+        ("Северо-Запад", "Северо-Запад"),
+        ("Юго-Восток", "Юго-Восток"),
+        ("Юго-Запад", "Юго-Запад"),
+    ]
+    MATERIAL_CHOICES = [
+        ("Дерево", "Дерево"),
+        ("Металл", "Металл"),
+        ("ПВХ", "ПВХ"),
+        ("Утепленная", "Утепленная"),
+    ]
+
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="doors"
+    )
+    height = models.FloatField()
+    width = models.FloatField()
+    orientation = models.CharField(max_length=50, choices=ORIENTATION_CHOICES)
+    material = models.CharField(max_length=50, choices=MATERIAL_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Дверь ({self.material}, {self.width}x{self.height})"
+
