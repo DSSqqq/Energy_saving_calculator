@@ -303,14 +303,28 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         </div>
       )}
 
-      <header className="app__header" style={{ marginBottom: '1.5rem' }}>
+      <header className="app__header" style={{ marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">🏢</span>{buildingInfo ? buildingInfo.name : 'Загрузка здания...'}
         </h1>
       </header>
 
+      <div className="breadcrumbs">
+        <a href="#/" className="breadcrumbs__item">Главная</a>
+        <span className="breadcrumbs__separator">/</span>
+        <a href="#/objects" className="breadcrumbs__item">Объекты</a>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item" onClick={onBack}>
+          {objectInfo ? objectInfo.name : '...'}
+        </span>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item breadcrumbs__item--active">
+          {buildingInfo ? buildingInfo.name : '...'}
+        </span>
+      </div>
+
       {objectInfo && (
-        <p style={{ marginTop: '-1rem', marginBottom: '2rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500, fontSize: '0.95rem' }}>
+        <p style={{ marginTop: '-1.25rem', marginBottom: '1.5rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500, fontSize: '0.95rem' }}>
           Объект: {objectInfo.name} {objectInfo.contract_number ? `(Договор: ${objectInfo.contract_number})` : ''}
         </p>
       )}
@@ -470,12 +484,6 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                 <button type="button" className="btn btn--primary btn--small" onClick={handleOpenCreateWindow}>
                   + Добавить окно
                 </button>
-                <button type="button" className="btn btn--ghost btn--small" onClick={onBack}>
-                  ← Назад к зданию
-                </button>
-                <a href="#/" className="btn btn--ghost btn--small" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                  На главную
-                </a>
               </div>
             </header>
 

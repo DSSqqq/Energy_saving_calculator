@@ -36,18 +36,17 @@ export function UsersPage() {
           <div className="loading-spinner" />
         </div>
       )}
-      <header className="app__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+      <header className="app__header" style={{ marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">👤</span>Кадры
         </h1>
-        <a 
-          href="#/" 
-          className="btn btn--ghost" 
-          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-        >
-          На главную
-        </a>
       </header>
+
+      <div className="breadcrumbs">
+        <a href="#/" className="breadcrumbs__item">Главная</a>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item breadcrumbs__item--active">Кадры</span>
+      </div>
 
       {error ? (
         <div className="panel panel--error">

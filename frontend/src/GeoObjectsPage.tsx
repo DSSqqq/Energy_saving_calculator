@@ -155,11 +155,17 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
           <div className="loading-spinner" />
         </div>
       )}
-      <header className="app__header" style={{ marginBottom: '2rem' }}>
+      <header className="app__header" style={{ marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">🏢</span>Геометрические параметры зданий
         </h1>
       </header>
+
+      <div className="breadcrumbs">
+        <a href="#/" className="breadcrumbs__item">Главная</a>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item breadcrumbs__item--active">Объекты</span>
+      </div>
 
       {/* Form Card (Create/Edit Modal) */}
       {isFormOpen && (
@@ -219,9 +225,6 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
               <button type="button" className="btn btn--primary btn--small" onClick={handleOpenCreate}>
                 + Добавить объект
               </button>
-              <a href="#/" className="btn btn--ghost btn--small" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                На главную
-              </a>
             </div>
           </header>
 

@@ -179,14 +179,22 @@ export function ObjectDetailsPage({ objectId, onBack, onOpenBuilding }: ObjectDe
           <div className="loading-spinner" />
         </div>
       )}
-      <header className="app__header" style={{ marginBottom: '1.5rem' }}>
+      <header className="app__header" style={{ marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">🏢</span>{objectInfo ? objectInfo.name : 'Загрузка объекта...'}
         </h1>
       </header>
 
+      <div className="breadcrumbs">
+        <a href="#/" className="breadcrumbs__item">Главная</a>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item" onClick={onBack}>Объекты</span>
+        <span className="breadcrumbs__separator">/</span>
+        <span className="breadcrumbs__item breadcrumbs__item--active">{objectInfo ? objectInfo.name : '...'}</span>
+      </div>
+
       {objectInfo && objectInfo.contract_number && (
-        <p style={{ marginTop: '-1rem', marginBottom: '2rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500, fontSize: '0.95rem' }}>
+        <p style={{ marginTop: '-1.25rem', marginBottom: '1.5rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500, fontSize: '0.95rem' }}>
           Договор: {objectInfo.contract_number}
         </p>
       )}
@@ -247,12 +255,6 @@ export function ObjectDetailsPage({ objectId, onBack, onOpenBuilding }: ObjectDe
               <button type="button" className="btn btn--primary btn--small" onClick={handleOpenCreate}>
                 + Добавить здание
               </button>
-              <button type="button" className="btn btn--ghost btn--small" onClick={onBack}>
-                ← Назад к объектам
-              </button>
-              <a href="#/" className="btn btn--ghost btn--small" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                На главную
-              </a>
             </div>
           </header>
 
