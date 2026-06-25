@@ -31,6 +31,11 @@ export function UsersPage() {
 
   return (
     <main className="app">
+      {loading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner" />
+        </div>
+      )}
       <header className="app__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">👤</span>Кадры
@@ -44,11 +49,7 @@ export function UsersPage() {
         </a>
       </header>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-          Загрузка списка пользователей...
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="panel panel--error">
           {error}
         </div>

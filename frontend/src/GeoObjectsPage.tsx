@@ -132,6 +132,11 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90, background: 'transparent' }}
         />
       )}
+      {loading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner" />
+        </div>
+      )}
       <header className="app__header" style={{ marginBottom: '2rem' }}>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
           <span className="title-icon">🏢</span>Геометрические параметры зданий
@@ -179,11 +184,7 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
         </section>
       )}
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-          Загрузка списка объектов...
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="panel panel--error">
           {error}
         </div>
