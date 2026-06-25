@@ -924,12 +924,20 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                   </div>
                 ) : (
                   sections.map((sec) => (
-                    <div key={sec.id} className="section-card">
+                    <div 
+                      key={sec.id} 
+                      className="section-card"
+                      style={{ zIndex: activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? 100 : 1 }}
+                    >
                       <header className="section-card__header">
                         <h3 className="section-card__title">
                           <span>🧱</span> {sec.name} <span style={{ fontSize: '0.85rem', color: '#2ed38a', fontWeight: 600 }}>({sec.floors} эт.)</span>
                         </h3>
-                        <div className="section-card__actions" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <div 
+                          className="section-card__actions" 
+                          style={{ position: 'relative', zIndex: activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? 101 : 1 }} 
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button 
                             type="button" 
                             className="btn-icon" 
@@ -943,7 +951,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleOpenEditSection(sec);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleOpenEditSection(sec);
                                 }}
@@ -954,7 +969,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item action-dropdown__item--danger" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleDeleteSection(sec.id);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleDeleteSection(sec.id);
                                 }}
@@ -1054,7 +1076,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                         <td style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>
                           {new Date(win.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td style={{ textAlign: 'right', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <td style={{ textAlign: 'right', position: 'relative', zIndex: activeDropdown && activeDropdown.type === 'window' && activeDropdown.id === win.id ? 101 : 1 }} onClick={(e) => e.stopPropagation()}>
                           <button 
                             type="button" 
                             className="btn-icon" 
@@ -1069,7 +1091,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleOpenEditWindow(win);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleOpenEditWindow(win);
                                 }}
@@ -1080,7 +1109,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item action-dropdown__item--danger" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleDeleteWindow(win.id);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleDeleteWindow(win.id);
                                 }}
@@ -1141,7 +1177,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                         <td style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>
                           {new Date(door.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td style={{ textAlign: 'right', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <td style={{ textAlign: 'right', position: 'relative', zIndex: activeDropdown && activeDropdown.type === 'door' && activeDropdown.id === door.id ? 101 : 1 }} onClick={(e) => e.stopPropagation()}>
                           <button 
                             type="button" 
                             className="btn-icon" 
@@ -1156,7 +1192,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleOpenEditDoor(door);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleOpenEditDoor(door);
                                 }}
@@ -1167,7 +1210,14 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                               <button 
                                 type="button" 
                                 className="action-dropdown__item action-dropdown__item--danger" 
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setActiveDropdown(null);
+                                  handleDeleteDoor(door.id);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setActiveDropdown(null);
                                   handleDeleteDoor(door.id);
                                 }}
