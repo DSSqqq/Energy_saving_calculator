@@ -122,3 +122,28 @@ class Door(models.Model):
     def __str__(self):
         return f"Дверь ({self.material}, {self.width}x{self.height})"
 
+
+class BuildingSection(models.Model):
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="sections"
+    )
+    name = models.CharField(max_length=255, default="Основная секция")
+    floors = models.IntegerField(default=1)
+    height_outer = models.FloatField(default=3.5)
+    height_inner = models.FloatField(default=3.0)
+    wall_material = models.CharField(max_length=100, default="Кирпич")
+    roof_type = models.CharField(max_length=100, default="Плоская")
+    roof_material = models.CharField(max_length=100, default="Рулонная кровля")
+    # Для CAD 3D визуализации и удобного ввода:
+    length = models.FloatField(default=10.0)
+    width = models.FloatField(default=10.0)
+    offset_x = models.FloatField(default=0.0)
+    offset_y = models.FloatField(default=0.0)
+    # Детальные стороны и их ориентация (JSONField)
+    sides = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.floors} эт.)"

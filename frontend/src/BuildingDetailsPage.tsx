@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BuildingCadViewer, type BuildingSectionItem, type SectionSide } from './measures/cad/BuildingCadViewer';
 
 interface WindowItem {
   id: number;
@@ -55,18 +56,43 @@ const WINDOW_MATERIAL_OPTIONS = ["ПВХ", "Дерево", "Алюминий"];
 const GLAZING_OPTIONS = ["Одинарное", "Двойное", "Тройное", "Двойное энергосберегающее"];
 const DOOR_MATERIAL_OPTIONS = ["Дерево", "Металл", "ПВХ", "Утепленная"];
 
+const WALL_MATERIAL_OPTIONS = ["Кирпич", "Железобетон", "Пеноблок", "Сендвич-панели", "Монолит", "Дерево"];
+const ROOF_TYPE_OPTIONS = ["Плоская", "Двускатная", "Четырехскатная", "Мансардная"];
+const ROOF_MATERIAL_OPTIONS = ["Рулонная кровля", "Металлочерепица", "Профнастил", "Шифер", "Ж/Б плиты"];
+
 export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDetailsPageProps) {
   const [buildingInfo, setBuildingInfo] = useState<BuildingInfo | null>(null);
   const [objectInfo, setObjectInfo] = useState<ObjectInfo | null>(null);
+  const [sections, setSections] = useState<BuildingSectionItem[]>([]);
   const [windows, setWindows] = useState<WindowItem[]>([]);
   const [doors, setDoors] = useState<DoorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Dropdown actions state
-  const [activeDropdown, setActiveDropdown] = useState<{ type: 'window' | 'door'; id: number } | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<{ type: 'window' | 'door' | 'section'; id: number } | null>(null);
 
-  // Forms State
+  // --- Section Forms State ---
+  const [isSectionFormOpen, setIsSectionFormOpen] = useState(false);
+  const [editingSection, setEditingSection] = useState<BuildingSectionItem | null>(null);
+  const [activeModalTab, setActiveModalTab] = useState<'main' | 'heights' | 'materials' | 'sides'>('main');
+  
+  const [sectionName, setSectionName] = useState('');
+  const [sectionFloors, setSectionFloors] = useState('1');
+  const [sectionHeightOuter, setSectionHeightOuter] = useState('3.5');
+  const [sectionHeightInner, setSectionHeightInner] = useState('3.0');
+  const [sectionWallMaterial, setSectionWallMaterial] = useState(WALL_MATERIAL_OPTIONS[0]);
+  const [sectionRoofType, setSectionRoofType] = useState(ROOF_TYPE_OPTIONS[0]);
+  const [sectionRoofMaterial, setSectionRoofMaterial] = useState(ROOF_MATERIAL_OPTIONS[0]);
+  const [sectionLength, setSectionLength] = useState('10');
+  const [sectionWidth, setSectionWidth] = useState('10');
+  const [sectionOffsetX, setSectionOffsetX] = useState('0');
+  const [sectionOffsetY, setSectionOffsetY] = useState('0');
+  const [sectionSides, setSectionSides] = useState<SectionSide[]>([]);
+  const [sectionFormError, setSectionFormError] = useState('');
+  const [sectionSubmitting, setSectionSubmitting] = useState(false);
+
+  // --- Windows Forms State ---
   const [isWindowFormOpen, setIsWindowFormOpen] = useState(false);
   const [editingWindow, setEditingWindow] = useState<WindowItem | null>(null);
   const [windowHeight, setWindowHeight] = useState('');
@@ -77,6 +103,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   const [windowFormError, setWindowFormError] = useState('');
   const [windowSubmitting, setWindowSubmitting] = useState(false);
 
+  // --- Doors Forms State ---
   const [isDoorFormOpen, setIsDoorFormOpen] = useState(false);
   const [editingDoor, setEditingDoor] = useState<DoorItem | null>(null);
   const [doorHeight, setDoorHeight] = useState('');
@@ -94,23 +121,26 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
       const promises = [
         fetch(`/api/buildings/${buildingId}/`),
         fetch(`/api/objects/${objectId}/`),
+        fetch(`/api/building-sections/?building=${buildingId}`),
         fetch(`/api/windows/?building=${buildingId}`),
         fetch(`/api/doors/?building=${buildingId}`)
       ];
 
-      const [bldRes, objRes, winRes, doorRes] = await Promise.all(promises);
+      const [bldRes, objRes, secRes, winRes, doorRes] = await Promise.all(promises);
 
-      if (!bldRes.ok || !objRes.ok || !winRes.ok || !doorRes.ok) {
+      if (!bldRes.ok || !objRes.ok || !secRes.ok || !winRes.ok || !doorRes.ok) {
         throw new Error('Не удалось загрузить данные здания');
       }
 
       const bldData = await bldRes.json();
       const objData = await objRes.json();
+      const secData = await secRes.json();
       const winData = await winRes.json();
       const doorData = await doorRes.json();
 
       setBuildingInfo(bldData);
       setObjectInfo(objData);
+      setSections(secData);
       setWindows(winData);
       setDoors(doorData);
     } catch (err: any) {
@@ -124,7 +154,157 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     fetchAllData();
   }, [buildingId, objectId]);
 
-  // Window Actions
+  // --- Section Actions ---
+  const handleOpenCreateSection = () => {
+    setEditingSection(null);
+    setActiveModalTab('main');
+    setSectionName(`Секция ${sections.length + 1}`);
+    setSectionFloors('1');
+    setSectionHeightOuter('3.5');
+    setSectionHeightInner('3.0');
+    setSectionWallMaterial(WALL_MATERIAL_OPTIONS[0]);
+    setSectionRoofType(ROOF_TYPE_OPTIONS[0]);
+    setSectionRoofMaterial(ROOF_MATERIAL_OPTIONS[0]);
+    setSectionLength('12');
+    setSectionWidth('8');
+    
+    // Automatically calculate offset_x to place next section side-by-side
+    let nextOffsetX = 0;
+    if (sections.length > 0) {
+      const lastSec = sections[sections.length - 1];
+      nextOffsetX = lastSec.offset_x + lastSec.length;
+    }
+    setSectionOffsetX(nextOffsetX.toString());
+    setSectionOffsetY('0');
+
+    // Generate default 4 sides
+    setSectionSides([
+      { id: '1', name: 'Главный фасад', length: 12, orientation: 'Север' },
+      { id: '2', name: 'Задний фасад', length: 12, orientation: 'Юг' },
+      { id: '3', name: 'Левая стена', length: 8, orientation: 'Запад' },
+      { id: '4', name: 'Правая стена', length: 8, orientation: 'Восток' }
+    ]);
+    
+    setSectionFormError('');
+    setIsSectionFormOpen(true);
+  };
+
+  const handleOpenEditSection = (sec: BuildingSectionItem) => {
+    setEditingSection(sec);
+    setActiveModalTab('main');
+    setSectionName(sec.name);
+    setSectionFloors(sec.floors.toString());
+    setSectionHeightOuter(sec.height_outer.toString());
+    setSectionHeightInner(sec.height_inner.toString());
+    setSectionWallMaterial(sec.wall_material);
+    setSectionRoofType(sec.roof_type);
+    setSectionRoofMaterial(sec.roof_material);
+    setSectionLength(sec.length.toString());
+    setSectionWidth(sec.width.toString());
+    setSectionOffsetX(sec.offset_x.toString());
+    setSectionOffsetY(sec.offset_y.toString());
+    setSectionSides(sec.sides || []);
+    setSectionFormError('');
+    setIsSectionFormOpen(true);
+  };
+
+  const handleDeleteSection = async (id: number) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот участок здания?')) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/building-sections/${id}/`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Не удалось удалить участок');
+      fetchAllData();
+    } catch (err: any) {
+      alert(err.message || 'Ошибка удаления');
+    }
+  };
+
+  // Side Management in Modal
+  const handleAddSide = () => {
+    const newSide: SectionSide = {
+      id: Date.now().toString(),
+      name: `Стена ${sectionSides.length + 1}`,
+      length: 5,
+      orientation: ORIENTATION_OPTIONS[0]
+    };
+    setSectionSides([...sectionSides, newSide]);
+  };
+
+  const handleUpdateSide = (id: string, field: keyof SectionSide, value: any) => {
+    setSectionSides(sectionSides.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  const handleRemoveSide = (id: string) => {
+    setSectionSides(sectionSides.filter(s => s.id !== id));
+  };
+
+  const handleSectionFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const floors = parseInt(sectionFloors);
+    const hOuter = parseFloat(sectionHeightOuter);
+    const hInner = parseFloat(sectionHeightInner);
+    const l = parseFloat(sectionLength);
+    const w = parseFloat(sectionWidth);
+    const ox = parseFloat(sectionOffsetX);
+    const oy = parseFloat(sectionOffsetY);
+
+    if (isNaN(floors) || floors <= 0 || isNaN(hOuter) || hOuter <= 0 || isNaN(hInner) || hInner <= 0 || isNaN(l) || l <= 0 || isNaN(w) || w <= 0) {
+      setSectionFormError('Пожалуйста, введите корректные положительные числовые значения для размеров и высот.');
+      return;
+    }
+
+    if (hInner > hOuter) {
+      setSectionFormError('Высота внутри не может быть больше высоты снаружи.');
+      return;
+    }
+
+    setSectionFormError('');
+    setSectionSubmitting(true);
+
+    const url = editingSection ? `/api/building-sections/${editingSection.id}/` : '/api/building-sections/';
+    const method = editingSection ? 'PUT' : 'POST';
+    const payload = {
+      building: buildingId,
+      name: sectionName || 'Секция здания',
+      floors,
+      height_outer: hOuter,
+      height_inner: hInner,
+      wall_material: sectionWallMaterial,
+      roof_type: sectionRoofType,
+      roof_material: sectionRoofMaterial,
+      length: l,
+      width: w,
+      offset_x: isNaN(ox) ? 0 : ox,
+      offset_y: isNaN(oy) ? 0 : oy,
+      sides: sectionSides
+    };
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Ошибка сохранения участка здания');
+      }
+
+      setIsSectionFormOpen(false);
+      fetchAllData();
+    } catch (err: any) {
+      setSectionFormError(err.message || 'Ошибка отправки запроса');
+    } finally {
+      setSectionSubmitting(false);
+    }
+  };
+
+  // --- Window Actions ---
   const handleOpenCreateWindow = () => {
     setEditingWindow(null);
     setWindowHeight('');
@@ -148,16 +328,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   };
 
   const handleDeleteWindow = async (id: number) => {
-    if (!window.confirm('Вы уверены, что хотите удалить это окно?')) {
-      return;
-    }
+    if (!window.confirm('Вы уверены, что хотите удалить это окно?')) return;
     try {
-      const res = await fetch(`/api/windows/${id}/`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        throw new Error('Не удалось удалить окно');
-      }
+      const res = await fetch(`/api/windows/${id}/`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Не удалось удалить окно');
       fetchAllData();
     } catch (err: any) {
       alert(err.message || 'Ошибка удаления');
@@ -192,12 +366,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || 'Ошибка сохранения');
       }
-
       setIsWindowFormOpen(false);
       fetchAllData();
     } catch (err: any) {
@@ -207,7 +379,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     }
   };
 
-  // Door Actions
+  // --- Door Actions ---
   const handleOpenCreateDoor = () => {
     setEditingDoor(null);
     setDoorHeight('');
@@ -229,16 +401,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   };
 
   const handleDeleteDoor = async (id: number) => {
-    if (!window.confirm('Вы уверены, что хотите удалить эту дверь?')) {
-      return;
-    }
+    if (!window.confirm('Вы уверены, что хотите удалить эту дверь?')) return;
     try {
-      const res = await fetch(`/api/doors/${id}/`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        throw new Error('Не удалось удалить дверь');
-      }
+      const res = await fetch(`/api/doors/${id}/`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Не удалось удалить дверь');
       fetchAllData();
     } catch (err: any) {
       alert(err.message || 'Ошибка удаления');
@@ -272,12 +438,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || 'Ошибка сохранения');
       }
-
       setIsDoorFormOpen(false);
       fetchAllData();
     } catch (err: any) {
@@ -329,7 +493,268 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         </p>
       )}
 
-      {/* Window Form Card */}
+      {/* --- Section Form Modal --- */}
+      {isSectionFormOpen && (
+        <div className="modal-overlay" onClick={() => setIsSectionFormOpen(false)}>
+          <div className="modal-card modal-card--large" onClick={(e) => e.stopPropagation()}>
+            <header className="block__header" style={{ marginBottom: '1.5rem' }}>
+              <h2>{editingSection ? 'Редактировать участок здания' : 'Добавить участок здания'}</h2>
+              <button type="button" className="modal-close-btn" onClick={() => setIsSectionFormOpen(false)} title="Закрыть">
+                ✕
+              </button>
+            </header>
+
+            {sectionFormError && <div className="panel panel--error" style={{ marginBottom: '1.25rem' }}>{sectionFormError}</div>}
+
+            {/* Modal Tabs */}
+            <div className="modal-tabs">
+              <button 
+                type="button" 
+                className={`modal-tab ${activeModalTab === 'main' ? 'modal-tab--active' : ''}`}
+                onClick={() => setActiveModalTab('main')}
+              >
+                Основные габариты
+              </button>
+              <button 
+                type="button" 
+                className={`modal-tab ${activeModalTab === 'heights' ? 'modal-tab--active' : ''}`}
+                onClick={() => setActiveModalTab('heights')}
+              >
+                Высоты и этажность
+              </button>
+              <button 
+                type="button" 
+                className={`modal-tab ${activeModalTab === 'materials' ? 'modal-tab--active' : ''}`}
+                onClick={() => setActiveModalTab('materials')}
+              >
+                Конструкции
+              </button>
+              <button 
+                type="button" 
+                className={`modal-tab ${activeModalTab === 'sides' ? 'modal-tab--active' : ''}`}
+                onClick={() => setActiveModalTab('sides')}
+              >
+                Периметр и стороны ({sectionSides.length})
+              </button>
+            </div>
+
+            <form onSubmit={handleSectionFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {activeModalTab === 'main' && (
+                <>
+                  <div className="field">
+                    <span>Название участка / секции *</span>
+                    <input 
+                      type="text" 
+                      value={sectionName} 
+                      onChange={(e) => setSectionName(e.target.value)} 
+                      placeholder="Основной корпус, Пристройка, Секция А..."
+                      required 
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div className="field">
+                      <span>Длина секции (м) *</span>
+                      <input 
+                        type="number" 
+                        step="0.1" 
+                        min="1" 
+                        value={sectionLength} 
+                        onChange={(e) => setSectionLength(e.target.value)} 
+                        placeholder="12" 
+                        required 
+                      />
+                    </div>
+                    <div className="field">
+                      <span>Ширина секции (м) *</span>
+                      <input 
+                        type="number" 
+                        step="0.1" 
+                        min="1" 
+                        value={sectionWidth} 
+                        onChange={(e) => setSectionWidth(e.target.value)} 
+                        placeholder="8" 
+                        required 
+                      />
+                    </div>
+                  </div>
+                  <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', color: '#2ed38a', fontSize: '0.9rem' }}>Стыковка секций в 3D пространстве</h4>
+                    <p style={{ margin: '0 0 1rem 0', color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                      Для корректного построения 3D CAD модели из нескольких участков укажите координаты смещения. Например, если первая секция имеет длину 12м, установите смещение по оси X второй секции равным 12, чтобы они состыковались вплотную.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                      <div className="field">
+                        <span>Смещение по оси X (м)</span>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          value={sectionOffsetX} 
+                          onChange={(e) => setSectionOffsetX(e.target.value)} 
+                          placeholder="0" 
+                        />
+                      </div>
+                      <div className="field">
+                        <span>Смещение по оси Y/Z (м)</span>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          value={sectionOffsetY} 
+                          onChange={(e) => setSectionOffsetY(e.target.value)} 
+                          placeholder="0" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeModalTab === 'heights' && (
+                <>
+                  <div className="field">
+                    <span>Количество этажей секции *</span>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="100" 
+                      value={sectionFloors} 
+                      onChange={(e) => setSectionFloors(e.target.value)} 
+                      placeholder="1" 
+                      required 
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div className="field">
+                      <span>Высота снаружи (м) *</span>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        min="1" 
+                        value={sectionHeightOuter} 
+                        onChange={(e) => setSectionHeightOuter(e.target.value)} 
+                        placeholder="3.5" 
+                        required 
+                      />
+                    </div>
+                    <div className="field">
+                      <span>Высота внутри от пола до потолка (м) *</span>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        min="1" 
+                        value={sectionHeightInner} 
+                        onChange={(e) => setSectionHeightInner(e.target.value)} 
+                        placeholder="3.0" 
+                        required 
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeModalTab === 'materials' && (
+                <>
+                  <div className="field">
+                    <span>Материал стен</span>
+                    <select value={sectionWallMaterial} onChange={(e) => setSectionWallMaterial(e.target.value)}>
+                      {WALL_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div className="field">
+                      <span>Тип крыши</span>
+                      <select value={sectionRoofType} onChange={(e) => setSectionRoofType(e.target.value)}>
+                        {ROOF_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <span>Материал крыши</span>
+                      <select value={sectionRoofMaterial} onChange={(e) => setSectionRoofMaterial(e.target.value)}>
+                        {ROOF_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeModalTab === 'sides' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', fontWeight: 600 }}>Настройка сторон и ориентации</span>
+                    <button type="button" className="btn btn--primary btn--small" onClick={handleAddSide}>
+                      + Добавить сторону
+                    </button>
+                  </div>
+
+                  {sectionSides.length === 0 ? (
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
+                      Стороны не указаны. Нажмите «+ Добавить сторону».
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '350px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                      {sectionSides.map((side) => (
+                        <div key={side.id} className="side-input-row">
+                          <div className="field" style={{ margin: 0 }}>
+                            <span style={{ fontSize: '0.75rem' }}>Название</span>
+                            <input 
+                              type="text" 
+                              value={side.name} 
+                              onChange={(e) => handleUpdateSide(side.id, 'name', e.target.value)} 
+                              placeholder="Фасад" 
+                              required 
+                            />
+                          </div>
+                          <div className="field" style={{ margin: 0 }}>
+                            <span style={{ fontSize: '0.75rem' }}>Длина (м)</span>
+                            <input 
+                              type="number" 
+                              step="0.1" 
+                              min="0.1" 
+                              value={side.length} 
+                              onChange={(e) => handleUpdateSide(side.id, 'length', parseFloat(e.target.value) || 0)} 
+                              required 
+                            />
+                          </div>
+                          <div className="field" style={{ margin: 0 }}>
+                            <span style={{ fontSize: '0.75rem' }}>Ориентация</span>
+                            <select value={side.orientation} onChange={(e) => handleUpdateSide(side.id, 'orientation', e.target.value)}>
+                              {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          </div>
+                          <button 
+                            type="button" 
+                            className="btn-icon" 
+                            style={{ color: '#ff5555', marginTop: '1.2rem' }} 
+                            onClick={() => handleRemoveSide(side.id)} 
+                            title="Удалить сторону"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
+                  * Обязательные поля
+                </span>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button type="button" className="btn btn--ghost" onClick={() => setIsSectionFormOpen(false)}>
+                    Отмена
+                  </button>
+                  <button type="submit" className="btn btn--primary" disabled={sectionSubmitting}>
+                    {sectionSubmitting ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- Window Form Modal --- */}
       {isWindowFormOpen && (
         <div className="modal-overlay" onClick={() => setIsWindowFormOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -400,7 +825,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         </div>
       )}
 
-      {/* Door Form Card */}
+      {/* --- Door Form Modal --- */}
       {isDoorFormOpen && (
         <div className="modal-overlay" onClick={() => setIsDoorFormOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -471,7 +896,120 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         </div>
       ) : (
         <>
-          {/* Windows Block */}
+          {/* --- CAD Building Geometry Block --- */}
+          <section className="block" style={{ marginBottom: '2.5rem' }}>
+            <header className="block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <h2 style={{ margin: 0 }}>Геометрические параметры и конструкция здания</h2>
+                <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 500 }}>
+                  Секций / участков здания: {sections.length}
+                </span>
+              </div>
+              <button type="button" className="btn btn--primary btn--small" onClick={handleOpenCreateSection}>
+                + Добавить участок здания
+              </button>
+            </header>
+
+            <div className="cad-grid">
+              {/* Left Column: Sections List */}
+              <div className="cad-sections-list">
+                {sections.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 2rem', color: 'rgba(255, 255, 255, 0.5)', fontStyle: 'italic', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.08)' }}>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.95rem' }}>
+                      Геометрия здания еще не задана. Добавьте один или несколько участков (например, разновысотные секции), чтобы настроить параметры стен, крыш и сторон.
+                    </p>
+                    <button type="button" className="btn btn--primary btn--small" onClick={handleOpenCreateSection}>
+                      + Добавить участок
+                    </button>
+                  </div>
+                ) : (
+                  sections.map((sec) => (
+                    <div key={sec.id} className="section-card">
+                      <header className="section-card__header">
+                        <h3 className="section-card__title">
+                          <span>🧱</span> {sec.name} <span style={{ fontSize: '0.85rem', color: '#2ed38a', fontWeight: 600 }}>({sec.floors} эт.)</span>
+                        </h3>
+                        <div className="section-card__actions">
+                          <button 
+                            type="button" 
+                            className="btn-icon" 
+                            onClick={() => setActiveDropdown(activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? null : { type: 'section', id: sec.id })}
+                            title="Действия"
+                          >
+                            ☰
+                          </button>
+                          {activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id && (
+                            <div className="action-dropdown">
+                              <button 
+                                type="button" 
+                                className="action-dropdown__item" 
+                                onClick={() => {
+                                  setActiveDropdown(null);
+                                  handleOpenEditSection(sec);
+                                }}
+                              >
+                                Редактировать
+                              </button>
+                              <div className="action-dropdown__divider" />
+                              <button 
+                                type="button" 
+                                className="action-dropdown__item action-dropdown__item--danger" 
+                                onClick={() => {
+                                  setActiveDropdown(null);
+                                  handleDeleteSection(sec.id);
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </header>
+
+                      <div className="section-card__grid">
+                        <div className="section-card__param">
+                          <span className="section-card__label">Габариты (Д×Ш)</span>
+                          <span className="section-card__value">{sec.length}м × {sec.width}м</span>
+                        </div>
+                        <div className="section-card__param">
+                          <span className="section-card__label">Высота (внеш / внутр)</span>
+                          <span className="section-card__value">{sec.height_outer}м / {sec.height_inner}м</span>
+                        </div>
+                        <div className="section-card__param">
+                          <span className="section-card__label">Материал стен</span>
+                          <span className="section-card__value">{sec.wall_material}</span>
+                        </div>
+                        <div className="section-card__param">
+                          <span className="section-card__label">Крыша ({sec.roof_type})</span>
+                          <span className="section-card__value">{sec.roof_material}</span>
+                        </div>
+                      </div>
+
+                      <div className="section-card__sides">
+                        <div className="section-card__sides-title">Периметр и стороны ({sec.sides?.length || 0}):</div>
+                        <div className="sides-badges">
+                          {sec.sides && sec.sides.length > 0 ? (
+                            sec.sides.map(s => (
+                              <span key={s.id} className="side-badge">
+                                {s.orientation}: {s.length}м ({s.name})
+                              </span>
+                            ))
+                          ) : (
+                            <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '0.85rem' }}>Стороны не заданы</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Right Column: 3D CAD Canvas Viewer */}
+              <BuildingCadViewer sections={sections} />
+            </div>
+          </section>
+
+          {/* --- Windows Block --- */}
           <section className="block" style={{ marginBottom: '2rem' }}>
             <header className="block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -560,7 +1098,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
             )}
           </section>
 
-          {/* Doors Block */}
+          {/* --- Doors Block --- */}
           <section className="block">
             <header className="block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>

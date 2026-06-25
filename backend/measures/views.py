@@ -17,8 +17,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from .registry import get_measure, list_measures
-from .models import Task, GeoObject, Building, Window, Door
-from .serializers import TaskSerializer, GeoObjectSerializer, BuildingSerializer, WindowSerializer, DoorSerializer
+from .models import Task, GeoObject, Building, Window, Door, BuildingSection
+from .serializers import TaskSerializer, GeoObjectSerializer, BuildingSerializer, WindowSerializer, DoorSerializer, BuildingSectionSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 
@@ -166,4 +166,21 @@ class DoorViewSet(ModelViewSet):
         building = serializer.validated_data.get('building')
         if building.object.user != self.request.user:
             raise PermissionDenied("У вас нет прав для добавления двери в это здание.")
+        serializer.save()
+
+class BuildingSectionViewSet(ModelViewSet):
+    serializer_class = BuildingSectionSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        building_id = self.request.query_params.get('building')
+        queryset = BuildingSection.objects.filter(building__object__user=self.request.user)
+        if building_id:
+            queryset = queryset.filter(building_id=building_id)
+        return queryset.order_by('id')
+
+    def perform_create(self, serializer):
+        building = serializer.validated_data.get('building')
+        if building.object.user != self.request.user:
+            raise PermissionDenied("У вас нет прав для добавления секции в это здание.")
         serializer.save()
