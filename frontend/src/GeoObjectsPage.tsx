@@ -38,6 +38,16 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
       const data = await res.json();
       setObjects(data.results || []);
       setTotalPages(Math.ceil((data.count || 0) / 10) || 1);
+      
+      // Cache fetched objects globally
+      if (data.results) {
+        if (!(window as any).__objectCache) {
+          (window as any).__objectCache = {};
+        }
+        data.results.forEach((obj: any) => {
+          (window as any).__objectCache[obj.id] = obj;
+        });
+      }
     } catch (err: any) {
       setError(err.message || 'Ошибка подключения к серверу');
     } finally {
@@ -112,6 +122,14 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || data.name?.[0] || 'Ошибка сохранения');
+      }
+
+      const savedData = await res.json();
+      if (savedData && savedData.id) {
+        if (!(window as any).__objectCache) {
+          (window as any).__objectCache = {};
+        }
+        (window as any).__objectCache[savedData.id] = savedData;
       }
 
       setIsFormOpen(false);

@@ -19,7 +19,8 @@ interface ObjectDetailsPageProps {
 }
 
 export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) {
-  const [objectInfo, setObjectInfo] = useState<GeoObject | null>(null);
+  const cachedObject = ((window as any).__objectCache || {})[objectId];
+  const [objectInfo, setObjectInfo] = useState<GeoObject | null>(cachedObject || null);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,18 +41,36 @@ export function ObjectDetailsPage({ objectId, onBack }: ObjectDetailsPageProps) 
     setLoading(true);
     setError('');
     try {
+      const promises: Promise<Response>[] = [];
+      let objPromise: Promise<Response> | null = null;
+
       // 1. Fetch Object Details if not already fetched
       if (!objectInfo) {
-        const objRes = await fetch(`/api/objects/${objectId}/`);
+        objPromise = fetch(`/api/objects/${objectId}/`);
+        promises.push(objPromise);
+      }
+
+      // 2. Fetch Buildings
+      const buildPromise = fetch(`/api/buildings/?object=${objectId}&page=${pageNumber}`);
+      promises.push(buildPromise);
+
+      await Promise.all(promises);
+
+      if (objPromise) {
+        const objRes = await objPromise;
         if (!objRes.ok) {
           throw new Error('Не удалось загрузить информацию об объекте');
         }
         const objData = await objRes.json();
         setObjectInfo(objData);
+        // Cache it globally
+        if (!(window as any).__objectCache) {
+          (window as any).__objectCache = {};
+        }
+        (window as any).__objectCache[objectId] = objData;
       }
 
-      // 2. Fetch Buildings
-      const buildRes = await fetch(`/api/buildings/?object=${objectId}&page=${pageNumber}`);
+      const buildRes = await buildPromise;
       if (!buildRes.ok) {
         throw new Error('Не удалось загрузить список зданий');
       }
