@@ -1,5 +1,5 @@
 type Props = {
-  onSelectView: (view: 'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks') => void
+  onSelectView: (view: 'home' | 'templates' | 'windows' | 'walls' | 'curtains' | 'heating' | 'tasks' | 'atp' | 'users' | 'geo_objects') => void
 }
 
 export function HomePage({ onSelectView }: Props) {
@@ -26,7 +26,7 @@ export function HomePage({ onSelectView }: Props) {
           <div className="bento-card__title">Отчеты по<br/>проектам</div>
         </div>
 
-        <div className="bento-card bento-card--yellow">
+        <div className="bento-card bento-card--yellow" onClick={() => onSelectView('users')}>
           <div className="bento-card__icon">👤</div>
           <div className="bento-card__title">Кадры</div>
         </div>
@@ -36,9 +36,9 @@ export function HomePage({ onSelectView }: Props) {
           <div className="bento-card__title">Годовой<br/>отчет</div>
         </div>
 
-        <div className="bento-card bento-card--pink">
+        <div className="bento-card bento-card--pink" onClick={() => onSelectView('geo_objects')}>
           <div className="bento-card__icon">💡</div>
-          <div className="bento-card__title">Новые<br/>продукты</div>
+          <div className="bento-card__title">Геометрические<br/>параметры зданий</div>
         </div>
 
         <div className="bento-card bento-card--blue">

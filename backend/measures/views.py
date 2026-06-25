@@ -17,8 +17,10 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from .registry import get_measure, list_measures
-from .models import Task
-from .serializers import TaskSerializer
+from .models import Task, GeoObject, Building
+from .serializers import TaskSerializer, GeoObjectSerializer, BuildingSerializer
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.exceptions import PermissionDenied
 
 
 class MeasuresListView(APIView):
@@ -83,5 +85,51 @@ class MeasureExportDocxView(APIView):
 class TaskViewSet(ModelViewSet):
     """ViewSet для полноценного управления задачами (CRUD)."""
 
-    queryset = Task.objects.all().order_by("id")
     serializer_class = TaskSerializer
+
+    def get_queryset(self):
+        return Task.objects.filter(user=self.request.user).order_by("id")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class GeoObjectPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class BuildingPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class GeoObjectViewSet(ModelViewSet):
+    serializer_class = GeoObjectSerializer
+    pagination_class = GeoObjectPagination
+
+    def get_queryset(self):
+        return GeoObject.objects.filter(user=self.request.user).order_by('-id')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class BuildingViewSet(ModelViewSet):
+    serializer_class = BuildingSerializer
+    pagination_class = BuildingPagination
+
+    def get_queryset(self):
+        object_id = self.request.query_params.get('object')
+        queryset = Building.objects.filter(object__user=self.request.user)
+        if object_id:
+            queryset = queryset.filter(object_id=object_id)
+        return queryset.order_by('id')
+
+    def perform_create(self, serializer):
+        object_val = serializer.validated_data.get('object')
+        if object_val.user != self.request.user:
+            raise PermissionDenied("У вас нет прав для добавления здания в этот объект.")
+        serializer.save()
