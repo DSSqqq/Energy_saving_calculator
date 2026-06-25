@@ -317,128 +317,138 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
 
       {/* Window Form Card */}
       {isWindowFormOpen && (
-        <section className="block" style={{ border: '1px solid #2ed38a', boxShadow: '0 4px 20px rgba(46, 211, 138, 0.1)', marginBottom: '2rem' }}>
-          <header className="block__header">
-            <h2>{editingWindow ? 'Редактировать окно' : 'Добавить новое окно'}</h2>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsWindowFormOpen(false)}>
-              Отмена
-            </button>
-          </header>
-          
-          {windowFormError && <div className="panel panel--error" style={{ marginBottom: '1rem' }}>{windowFormError}</div>}
-          
-          <form onSubmit={handleWindowFormSubmit} className="grid" style={{ gridTemplateColumns: 'repeat(5, 1fr) auto', alignItems: 'flex-end', gap: '1rem' }}>
-            <div className="field">
-              <span>Высота (м) *</span>
-              <input 
-                type="number" 
-                step="0.01"
-                min="0.1"
-                max="10"
-                value={windowHeight} 
-                onChange={(e) => setWindowHeight(e.target.value)} 
-                placeholder="1.5"
-                required 
-              />
-            </div>
-            <div className="field">
-              <span>Ширина (м) *</span>
-              <input 
-                type="number" 
-                step="0.01"
-                min="0.1"
-                max="10"
-                value={windowWidth} 
-                onChange={(e) => setWindowWidth(e.target.value)} 
-                placeholder="1.2"
-                required 
-              />
-            </div>
-            <div className="field">
-              <span>Ориентация</span>
-              <select value={windowOrientation} onChange={(e) => setWindowOrientation(e.target.value)}>
-                {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <span>Материал</span>
-              <select value={windowMaterial} onChange={(e) => setWindowMaterial(e.target.value)}>
-                {WINDOW_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <span>Остекление</span>
-              <select value={windowGlazing} onChange={(e) => setWindowGlazing(e.target.value)}>
-                {GLAZING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <button type="submit" className="btn btn--primary" disabled={windowSubmitting} style={{ height: '2.5rem' }}>
-                {windowSubmitting ? 'Сохранение...' : 'Сохранить'}
+        <div className="modal-overlay" onClick={() => setIsWindowFormOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <header className="block__header" style={{ marginBottom: '1.5rem' }}>
+              <h2>{editingWindow ? 'Редактировать окно' : 'Добавить новое окно'}</h2>
+              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsWindowFormOpen(false)}>
+                Отмена
               </button>
-            </div>
-          </form>
-        </section>
+            </header>
+            
+            {windowFormError && <div className="panel panel--error" style={{ marginBottom: '1.25rem' }}>{windowFormError}</div>}
+            
+            <form onSubmit={handleWindowFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="field">
+                <span>Высота (м) *</span>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="0.1"
+                  max="10"
+                  value={windowHeight} 
+                  onChange={(e) => setWindowHeight(e.target.value)} 
+                  placeholder="1.5"
+                  required 
+                />
+              </div>
+              <div className="field">
+                <span>Ширина (м) *</span>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="0.1"
+                  max="10"
+                  value={windowWidth} 
+                  onChange={(e) => setWindowWidth(e.target.value)} 
+                  placeholder="1.2"
+                  required 
+                />
+              </div>
+              <div className="field">
+                <span>Ориентация</span>
+                <select value={windowOrientation} onChange={(e) => setWindowOrientation(e.target.value)}>
+                  {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <span>Материал</span>
+                <select value={windowMaterial} onChange={(e) => setWindowMaterial(e.target.value)}>
+                  {WINDOW_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <span>Остекление</span>
+                <select value={windowGlazing} onChange={(e) => setWindowGlazing(e.target.value)}>
+                  {GLAZING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn--ghost" onClick={() => setIsWindowFormOpen(false)}>
+                  Отмена
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={windowSubmitting}>
+                  {windowSubmitting ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Door Form Card */}
       {isDoorFormOpen && (
-        <section className="block" style={{ border: '1px solid #2ed38a', boxShadow: '0 4px 20px rgba(46, 211, 138, 0.1)', marginBottom: '2rem' }}>
-          <header className="block__header">
-            <h2>{editingDoor ? 'Редактировать дверь' : 'Добавить новую дверь'}</h2>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsDoorFormOpen(false)}>
-              Отмена
-            </button>
-          </header>
-          
-          {doorFormError && <div className="panel panel--error" style={{ marginBottom: '1rem' }}>{doorFormError}</div>}
-          
-          <form onSubmit={handleDoorFormSubmit} className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr) auto', alignItems: 'flex-end', gap: '1rem' }}>
-            <div className="field">
-              <span>Высота (м) *</span>
-              <input 
-                type="number" 
-                step="0.01"
-                min="0.1"
-                max="10"
-                value={doorHeight} 
-                onChange={(e) => setDoorHeight(e.target.value)} 
-                placeholder="2.1"
-                required 
-              />
-            </div>
-            <div className="field">
-              <span>Ширина (м) *</span>
-              <input 
-                type="number" 
-                step="0.01"
-                min="0.1"
-                max="10"
-                value={doorWidth} 
-                onChange={(e) => setDoorWidth(e.target.value)} 
-                placeholder="0.9"
-                required 
-              />
-            </div>
-            <div className="field">
-              <span>Ориентация</span>
-              <select value={doorOrientation} onChange={(e) => setDoorOrientation(e.target.value)}>
-                {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <span>Материал</span>
-              <select value={doorMaterial} onChange={(e) => setDoorMaterial(e.target.value)}>
-                {DOOR_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <button type="submit" className="btn btn--primary" disabled={doorSubmitting} style={{ height: '2.5rem' }}>
-                {doorSubmitting ? 'Сохранение...' : 'Сохранить'}
+        <div className="modal-overlay" onClick={() => setIsDoorFormOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <header className="block__header" style={{ marginBottom: '1.5rem' }}>
+              <h2>{editingDoor ? 'Редактировать дверь' : 'Добавить новую дверь'}</h2>
+              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsDoorFormOpen(false)}>
+                Отмена
               </button>
-            </div>
-          </form>
-        </section>
+            </header>
+            
+            {doorFormError && <div className="panel panel--error" style={{ marginBottom: '1.25rem' }}>{doorFormError}</div>}
+            
+            <form onSubmit={handleDoorFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="field">
+                <span>Высота (м) *</span>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="0.1"
+                  max="10"
+                  value={doorHeight} 
+                  onChange={(e) => setDoorHeight(e.target.value)} 
+                  placeholder="2.1"
+                  required 
+                />
+              </div>
+              <div className="field">
+                <span>Ширина (м) *</span>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="0.1"
+                  max="10"
+                  value={doorWidth} 
+                  onChange={(e) => setDoorWidth(e.target.value)} 
+                  placeholder="0.9"
+                  required 
+                />
+              </div>
+              <div className="field">
+                <span>Ориентация</span>
+                <select value={doorOrientation} onChange={(e) => setDoorOrientation(e.target.value)}>
+                  {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <span>Материал</span>
+                <select value={doorMaterial} onChange={(e) => setDoorMaterial(e.target.value)}>
+                  {DOOR_MATERIAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn--ghost" onClick={() => setIsDoorFormOpen(false)}>
+                  Отмена
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={doorSubmitting}>
+                  {doorSubmitting ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {error ? (

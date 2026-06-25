@@ -161,45 +161,50 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
         </h1>
       </header>
 
-      {/* Form Card (Create/Edit) */}
+      {/* Form Card (Create/Edit Modal) */}
       {isFormOpen && (
-        <section className="block" style={{ border: '1px solid #2ed38a', boxShadow: '0 4px 20px rgba(46, 211, 138, 0.1)' }}>
-          <header className="block__header">
-            <h2>{editingObject ? 'Редактировать объект' : 'Добавить новый объект'}</h2>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsFormOpen(false)}>
-              Отмена
-            </button>
-          </header>
-          
-          {formError && <div className="panel panel--error" style={{ marginBottom: '1rem' }}>{formError}</div>}
-          
-          <form onSubmit={handleFormSubmit} className="grid" style={{ gridTemplateColumns: '1fr 1fr auto', alignItems: 'flex-end', gap: '1rem' }}>
-            <div className="field">
-              <span>Название объекта *</span>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="Например, Офисный центр 'Прогресс'"
-                required 
-              />
-            </div>
-            <div className="field">
-              <span>Номер договора</span>
-              <input 
-                type="text" 
-                value={contractNumber} 
-                onChange={(e) => setContractNumber(e.target.value)} 
-                placeholder="Например, № Д-104/26"
-              />
-            </div>
-            <div>
-              <button type="submit" className="btn btn--primary" disabled={submitting} style={{ height: '2.5rem' }}>
-                {submitting ? 'Сохранение...' : 'Сохранить'}
+        <div className="modal-overlay" onClick={() => setIsFormOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <header className="block__header" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0 }}>{editingObject ? 'Редактировать объект' : 'Добавить новый объект'}</h2>
+              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsFormOpen(false)}>
+                Отмена
               </button>
-            </div>
-          </form>
-        </section>
+            </header>
+            
+            {formError && <div className="panel panel--error" style={{ marginBottom: '1.25rem' }}>{formError}</div>}
+            
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="field">
+                <span>Название объекта *</span>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  placeholder="Например, Офисный центр 'Прогресс'"
+                  required 
+                />
+              </div>
+              <div className="field">
+                <span>Номер договора</span>
+                <input 
+                  type="text" 
+                  value={contractNumber} 
+                  onChange={(e) => setContractNumber(e.target.value)} 
+                  placeholder="Например, № Д-104/26"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn--ghost" onClick={() => setIsFormOpen(false)}>
+                  Отмена
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={submitting}>
+                  {submitting ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {error ? (
