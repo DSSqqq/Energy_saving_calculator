@@ -929,40 +929,31 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                         <h3 className="section-card__title">
                           <span>🧱</span> {sec.name} <span style={{ fontSize: '0.85rem', color: '#2ed38a', fontWeight: 600 }}>({sec.floors} эт.)</span>
                         </h3>
-                        <div className="section-card__actions">
+                        <div className="section-card__actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button 
                             type="button" 
-                            className="btn-icon" 
-                            onClick={() => setActiveDropdown(activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? null : { type: 'section', id: sec.id })}
-                            title="Действия"
+                            className="btn btn--primary btn--small" 
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditSection(sec);
+                            }}
+                            title="Редактировать параметры секции"
                           >
-                            ☰
+                            ✏️ Редактировать
                           </button>
-                          {activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id && (
-                            <div className="action-dropdown">
-                              <button 
-                                type="button" 
-                                className="action-dropdown__item" 
-                                onClick={() => {
-                                  setActiveDropdown(null);
-                                  handleOpenEditSection(sec);
-                                }}
-                              >
-                                Редактировать
-                              </button>
-                              <div className="action-dropdown__divider" />
-                              <button 
-                                type="button" 
-                                className="action-dropdown__item action-dropdown__item--danger" 
-                                onClick={() => {
-                                  setActiveDropdown(null);
-                                  handleDeleteSection(sec.id);
-                                }}
-                              >
-                                Удалить
-                              </button>
-                            </div>
-                          )}
+                          <button 
+                            type="button" 
+                            className="btn btn--ghost btn--small" 
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ff5555', borderColor: 'rgba(255,85,85,0.3)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSection(sec.id);
+                            }}
+                            title="Удалить секцию"
+                          >
+                            🗑️ Удалить
+                          </button>
                         </div>
                       </header>
 
