@@ -167,8 +167,8 @@ export function GeoObjectsPage({ onOpenObject }: GeoObjectsPageProps) {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <header className="block__header" style={{ marginBottom: '1.5rem' }}>
               <h2 style={{ margin: 0 }}>{editingObject ? 'Редактировать объект' : 'Добавить новый объект'}</h2>
-              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsFormOpen(false)}>
-                Отмена
+              <button type="button" className="modal-close-btn" onClick={() => setIsFormOpen(false)} title="Закрыть">
+                ✕
               </button>
             </header>
             

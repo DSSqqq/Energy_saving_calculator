@@ -321,8 +321,8 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <header className="block__header" style={{ marginBottom: '1.5rem' }}>
               <h2>{editingWindow ? 'Редактировать окно' : 'Добавить новое окно'}</h2>
-              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsWindowFormOpen(false)}>
-                Отмена
+              <button type="button" className="modal-close-btn" onClick={() => setIsWindowFormOpen(false)} title="Закрыть">
+                ✕
               </button>
             </header>
             
@@ -392,8 +392,8 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <header className="block__header" style={{ marginBottom: '1.5rem' }}>
               <h2>{editingDoor ? 'Редактировать дверь' : 'Добавить новую дверь'}</h2>
-              <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsDoorFormOpen(false)}>
-                Отмена
+              <button type="button" className="modal-close-btn" onClick={() => setIsDoorFormOpen(false)} title="Закрыть">
+                ✕
               </button>
             </header>
             

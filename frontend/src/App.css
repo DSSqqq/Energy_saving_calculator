@@ -1015,3 +1015,30 @@
   }
 }
 
+.modal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 8px;
+  background: #2ed38a;
+  border: 1px solid #2ed38a;
+  color: #121e1b;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  box-shadow: 0 4px 15px rgba(46, 211, 138, 0.25);
+  box-sizing: border-box;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  background: #39e297;
+  border-color: #39e297;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(46, 211, 138, 0.35);
+}
+
