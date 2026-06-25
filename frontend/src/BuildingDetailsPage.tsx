@@ -452,14 +452,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   };
 
   return (
-    <main className="app">
-      {activeDropdown !== null && (
-        <div 
-          className="dropdown-backdrop" 
-          onClick={() => setActiveDropdown(null)} 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90, background: 'transparent' }}
-        />
-      )}
+    <main className="app" onClick={() => setActiveDropdown(null)}>
 
       {loading && (
         <div className="loading-overlay">
