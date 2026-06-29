@@ -59,6 +59,7 @@ const DOOR_MATERIAL_OPTIONS = ["Дерево", "Металл", "ПВХ", "Уте
 const WALL_MATERIAL_OPTIONS = ["Кирпич", "Железобетон", "Пеноблок", "Сендвич-панели", "Монолит", "Дерево"];
 const ROOF_TYPE_OPTIONS = ["Плоская", "Двускатная", "Четырехскатная", "Мансардная"];
 const ROOF_MATERIAL_OPTIONS = ["Рулонная кровля", "Металлочерепица", "Профнастил", "Шифер", "Ж/Б плиты"];
+const SECTIONS_PER_PAGE = 5;
 
 export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDetailsPageProps) {
   const [buildingInfo, setBuildingInfo] = useState<BuildingInfo | null>(null);
@@ -71,6 +72,8 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
 
   // Dropdown actions state
   const [activeDropdown, setActiveDropdown] = useState<{ type: 'window' | 'door' | 'section'; id: number } | null>(null);
+  const [expandedSectionId, setExpandedSectionId] = useState<number | null>(null);
+  const [sectionPage, setSectionPage] = useState(1);
 
   // --- Section Forms State ---
   const [isSectionFormOpen, setIsSectionFormOpen] = useState(false);
@@ -154,6 +157,42 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     fetchAllData();
   }, [buildingId, objectId]);
 
+  useEffect(() => {
+    setSectionPage(1);
+    setExpandedSectionId(null);
+  }, [buildingId]);
+
+  const sectionTotalPages = Math.max(1, Math.ceil(sections.length / SECTIONS_PER_PAGE));
+
+  useEffect(() => {
+    if (sectionPage > sectionTotalPages) {
+      setSectionPage(sectionTotalPages);
+    }
+  }, [sectionPage, sectionTotalPages]);
+
+  const paginatedSections = sections.slice(
+    (sectionPage - 1) * SECTIONS_PER_PAGE,
+    sectionPage * SECTIONS_PER_PAGE,
+  );
+
+  const goToSectionPage = (nextPage: number) => {
+    setSectionPage(nextPage);
+    setExpandedSectionId(null);
+    setActiveDropdown(null);
+  };
+
+  useEffect(() => {
+    if (paginatedSections.length === 0) {
+      if (expandedSectionId !== null) setExpandedSectionId(null);
+      return;
+    }
+    const expandedOnPage = expandedSectionId !== null
+      && paginatedSections.some(s => s.id === expandedSectionId);
+    if (!expandedOnPage) {
+      setExpandedSectionId(paginatedSections[0].id);
+    }
+  }, [sectionPage, sections, expandedSectionId]);
+
   // --- Section Actions ---
   const handleOpenCreateSection = () => {
     setEditingSection(null);
@@ -217,6 +256,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Не удалось удалить участок');
+      if (expandedSectionId === id) setExpandedSectionId(null);
       fetchAllData();
     } catch (err: any) {
       alert(err.message || 'Ошибка удаления');
@@ -905,7 +945,16 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
 
             <div className="cad-grid">
               {/* Left Column: Sections List */}
-              <div className="cad-sections-list">
+              <div className="cad-sections-column cad-sections-card">
+                <header className="cad-sections-card__header">
+                  <h3 className="cad-sections-card__title">
+                    <span>🧱</span> Секции здания
+                  </h3>
+                  <span className="cad-sections-card__count">
+                    {sections.length} {sections.length === 1 ? 'участок' : sections.length >= 2 && sections.length <= 4 ? 'участка' : 'участков'}
+                  </span>
+                </header>
+                <div className="cad-sections-list">
                 {sections.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem 2rem', color: 'rgba(255, 255, 255, 0.5)', fontStyle: 'italic', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.08)' }}>
                     <p style={{ margin: '0 0 1rem 0', fontSize: '0.95rem' }}>
@@ -916,106 +965,150 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                     </button>
                   </div>
                 ) : (
-                  sections.map((sec) => (
-                    <div 
-                      key={sec.id} 
-                      className="section-card"
+                  paginatedSections.map((sec) => {
+                    const isExpanded = expandedSectionId === sec.id;
+                    return (
+                    <div
+                      key={sec.id}
+                      className={`section-item${isExpanded ? ' section-item--expanded' : ''}`}
                       style={{ zIndex: activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? 100 : 1 }}
                     >
-                      <header className="section-card__header">
-                        <h3 className="section-card__title">
-                          <span>🧱</span> {sec.name} <span style={{ fontSize: '0.85rem', color: '#2ed38a', fontWeight: 600 }}>({sec.floors} эт.)</span>
-                        </h3>
-                        <div 
-                          className="section-card__actions" 
-                          style={{ position: 'relative', zIndex: activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? 101 : 1 }} 
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button 
-                            type="button" 
-                            className="btn-icon" 
-                            onClick={() => setActiveDropdown(activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? null : { type: 'section', id: sec.id })}
-                            title="Действия"
+                      <button
+                        type="button"
+                        className={`section-tab${isExpanded ? ' section-tab--active' : ''}`}
+                        onClick={() => setExpandedSectionId(isExpanded ? null : sec.id)}
+                        aria-expanded={isExpanded}
+                      >
+                        <span className="section-tab__icon">🧱</span>
+                        <span className="section-tab__name">{sec.name}</span>
+                        <span className="section-tab__meta">({sec.floors} эт.) · {sec.length}×{sec.width} м</span>
+                        <span className="section-tab__chevron" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+                      </button>
+
+                      {isExpanded && (
+                      <div className="section-card section-card--expanded">
+                        <header className="section-card__header">
+                          <h3 className="section-card__title">
+                            <span>🧱</span> {sec.name} <span style={{ fontSize: '0.85rem', color: '#2ed38a', fontWeight: 600 }}>({sec.floors} эт.)</span>
+                          </h3>
+                          <div
+                            className="section-card__actions"
+                            style={{ position: 'relative', zIndex: activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? 101 : 1 }}
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            ☰
-                          </button>
-                          {activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id && (
-                            <div className="action-dropdown">
-                              <button 
-                                type="button" 
-                                className="action-dropdown__item" 
-                                onMouseDown={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  setActiveDropdown(null);
-                                  handleOpenEditSection(sec);
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDropdown(null);
-                                  handleOpenEditSection(sec);
-                                }}
-                              >
-                                Редактировать
-                              </button>
-                              <div className="action-dropdown__divider" />
-                              <button 
-                                type="button" 
-                                className="action-dropdown__item action-dropdown__item--danger" 
-                                onMouseDown={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  setActiveDropdown(null);
-                                  handleDeleteSection(sec.id);
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDropdown(null);
-                                  handleDeleteSection(sec.id);
-                                }}
-                              >
-                                Удалить
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </header>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              onClick={() => setActiveDropdown(activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id ? null : { type: 'section', id: sec.id })}
+                              title="Действия"
+                            >
+                              ☰
+                            </button>
+                            {activeDropdown && activeDropdown.type === 'section' && activeDropdown.id === sec.id && (
+                              <div className="action-dropdown">
+                                <button
+                                  type="button"
+                                  className="action-dropdown__item"
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setActiveDropdown(null);
+                                    handleOpenEditSection(sec);
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdown(null);
+                                    handleOpenEditSection(sec);
+                                  }}
+                                >
+                                  Редактировать
+                                </button>
+                                <div className="action-dropdown__divider" />
+                                <button
+                                  type="button"
+                                  className="action-dropdown__item action-dropdown__item--danger"
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setActiveDropdown(null);
+                                    handleDeleteSection(sec.id);
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdown(null);
+                                    handleDeleteSection(sec.id);
+                                  }}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </header>
 
-                      <div className="section-card__grid">
-                        <div className="section-card__param">
-                          <span className="section-card__label">Габариты (Д×Ш)</span>
-                          <span className="section-card__value">{sec.length}м × {sec.width}м</span>
+                        <div className="section-card__grid">
+                          <div className="section-card__param">
+                            <span className="section-card__label">Габариты (Д×Ш)</span>
+                            <span className="section-card__value">{sec.length}м × {sec.width}м</span>
+                          </div>
+                          <div className="section-card__param">
+                            <span className="section-card__label">Высота (внеш / внутр)</span>
+                            <span className="section-card__value">{sec.height_outer}м / {sec.height_inner}м</span>
+                          </div>
+                          <div className="section-card__param">
+                            <span className="section-card__label">Материал стен</span>
+                            <span className="section-card__value">{sec.wall_material}</span>
+                          </div>
+                          <div className="section-card__param">
+                            <span className="section-card__label">Крыша ({sec.roof_type})</span>
+                            <span className="section-card__value">{sec.roof_material}</span>
+                          </div>
                         </div>
-                        <div className="section-card__param">
-                          <span className="section-card__label">Высота (внеш / внутр)</span>
-                          <span className="section-card__value">{sec.height_outer}м / {sec.height_inner}м</span>
-                        </div>
-                        <div className="section-card__param">
-                          <span className="section-card__label">Материал стен</span>
-                          <span className="section-card__value">{sec.wall_material}</span>
-                        </div>
-                        <div className="section-card__param">
-                          <span className="section-card__label">Крыша ({sec.roof_type})</span>
-                          <span className="section-card__value">{sec.roof_material}</span>
+
+                        <div className="section-card__sides">
+                          <div className="section-card__sides-title">Периметр и стороны ({sec.sides?.length || 0}):</div>
+                          <div className="sides-badges">
+                            {sec.sides && sec.sides.length > 0 ? (
+                              sec.sides.map(s => (
+                                <span key={s.id} className="side-badge">
+                                  {s.orientation}: {s.length}м ({s.name})
+                                </span>
+                              ))
+                            ) : (
+                              <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '0.85rem' }}>Стороны не заданы</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      <div className="section-card__sides">
-                        <div className="section-card__sides-title">Периметр и стороны ({sec.sides?.length || 0}):</div>
-                        <div className="sides-badges">
-                          {sec.sides && sec.sides.length > 0 ? (
-                            sec.sides.map(s => (
-                              <span key={s.id} className="side-badge">
-                                {s.orientation}: {s.length}м ({s.name})
-                              </span>
-                            ))
-                          ) : (
-                            <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '0.85rem' }}>Стороны не заданы</span>
-                          )}
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  ))
+                    );
+                  })
+                )}
+                </div>
+
+                {sections.length > SECTIONS_PER_PAGE && (
+                  <div className="cad-sections-pagination">
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--small"
+                      disabled={sectionPage === 1}
+                      onClick={() => goToSectionPage(sectionPage - 1)}
+                    >
+                      ← Назад
+                    </button>
+                    <span className="cad-sections-pagination__info">
+                      Страница {sectionPage} из {sectionTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--small"
+                      disabled={sectionPage === sectionTotalPages}
+                      onClick={() => goToSectionPage(sectionPage + 1)}
+                    >
+                      Вперед →
+                    </button>
+                  </div>
                 )}
               </div>
 

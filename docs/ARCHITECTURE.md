@@ -36,19 +36,24 @@ energy saving calculator/
 │   └── requirements.txt
 ├── frontend/                     # React (Vite)
 │   ├── src/
-│   │   ├── App.tsx               # корневой экран (сейчас открывает мероприятие «Окна»)
-│   │   ├── App.css               # стили UI
+│   │   ├── App.tsx               # корневой экран, маршрутизация по объектам/зданиям
+│   │   ├── App.css               # стили UI (в т.ч. CAD-блок секций)
+│   │   ├── BuildingDetailsPage.tsx  # здание: секции, окна, двери, 3D CAD
 │   │   ├── main.tsx              # точка входа React
-│   │   └── measures/windows/     # компоненты мероприятия «Окна»
-│   │       ├── BuildingsList.tsx
-│   │       ├── SharedParamsForm.tsx
-│   │       ├── InvestmentTable.tsx
-│   │       ├── ResultsPanel.tsx
-│   │       ├── WindowsMeasure.tsx
-│   │       ├── defaults.ts
-│   │       ├── format.ts
-│   │       └── types.ts
-│   └── vite.config.ts            # dev-сервер + proxy /api → Django
+│   │   ├── measures/
+│   │   │   ├── cad/
+│   │   │   │   └── BuildingCadViewer.tsx  # canvas: 3D/2D модель секций здания
+│   │   │   └── windows/          # компоненты мероприятия «Окна»
+│   │   │       ├── BuildingsList.tsx
+│   │   │       ├── SharedParamsForm.tsx
+│   │   │       ├── InvestmentTable.tsx
+│   │   │       ├── ResultsPanel.tsx
+│   │   │       ├── WindowsMeasure.tsx
+│   │   │       ├── defaults.ts
+│   │   │       ├── format.ts
+│   │   │       └── types.ts
+│   ├── .env.example              # VITE_DEV_API_TARGET для локального proxy
+│   └── vite.config.ts            # dev-сервер + proxy /api → Django (через .env.local)
 └── docs/
     ├── ARCHITECTURE.md
     ├── API.md
@@ -110,8 +115,9 @@ register_measure(MeasureDefinition(
 | Заменить шрифты/стили шаблона | пересобрать `backend/measures/windows/template/base.docx` через `scripts/strip_base.py` |
 | Финансовая модель (NPV/IRR/PBP/DPBP) | `backend/measures/finance/npv.py` |
 | Стили/UX | `frontend/src/App.css`, компоненты в `frontend/src/measures/windows/` |
+| Секции здания, пагинация, 3D CAD | `frontend/src/BuildingDetailsPage.tsx`, `frontend/src/measures/cad/BuildingCadViewer.tsx` |
 | CORS / продакшен | `backend/config/settings.py` |
-| Прокси dev-сервера | `frontend/vite.config.ts` (`server.proxy`) |
+| Прокси dev-сервера | `frontend/vite.config.ts`, `frontend/.env.local` (`VITE_DEV_API_TARGET`) |
 
 ## Зависимости между слоями
 

@@ -53,18 +53,31 @@ cd frontend
 npx vite --port 5174
 ```
 
-**Важно:** `target` в `frontend/vite.config.ts` должен совпадать с портом Django. При запуске бэкенда на `8001` временно измените:
+**Важно:** порт Django задаётся переменной `VITE_DEV_API_TARGET` в `frontend/.env.local` (файл не попадает в git):
 
-```ts
-proxy: {
-  '/api': {
-    target: 'http://127.0.0.1:8001',
-    changeOrigin: true,
-  },
-},
+```powershell
+cd frontend
+copy .env.example .env.local
+# Отредактируйте .env.local, если Django не на 8000:
+# VITE_DEV_API_TARGET=http://127.0.0.1:8001
 ```
 
-После изменения `vite.config.ts` dev-сервер перезапускается автоматически. Не коммитьте локальный порт в репозиторий — в git остаётся стандартный `8000`.
+После изменения `.env.local` или `vite.config.ts` перезапустите `npm run dev`.
+
+Шаблон переменных: `frontend/.env.example` → скопируйте в `frontend/.env.local`.
+
+### UI: секции здания и 3D CAD
+
+На странице здания (`BuildingDetailsPage`) блок «Геометрические параметры и конструкция здания»:
+
+| Элемент | Поведение |
+|---------|-----------|
+| Список секций | Компактные вкладки в карточке с зелёной обводкой; по клику раскрываются детали (габариты, материалы, периметр) |
+| Пагинация | До **5 секций** на страницу; блок навигации закреплён внизу колонки, на уровне canvas |
+| Секция по умолчанию | Первая секция текущей страницы открыта, если пользователь не выбрал другую |
+| 3D CAD | Интерактивная модель (`BuildingCadViewer`) в соседней колонке — Solid / Wireframe / 2D План |
+
+Компоненты: `frontend/src/BuildingDetailsPage.tsx`, `frontend/src/measures/cad/BuildingCadViewer.tsx`, стили в `frontend/src/App.css` (блок `.cad-grid`).
 
 ## Документация
 
