@@ -33,7 +33,38 @@ npm install
 npm run dev
 ```
 
-UI обычно: `http://localhost:5173`. Запросы `/api/...` Vite проксирует на Django (`vite.config.ts`).
+UI обычно: `http://localhost:5173`. Запросы `/api/...` Vite проксирует на Django (`vite.config.ts` → `http://127.0.0.1:8000`).
+
+### Альтернативные порты (локальная разработка)
+
+Если порты `8000` или `5173` уже заняты (например, другим процессом IDE):
+
+**Django на свободном порту:**
+
+```powershell
+cd backend
+python manage.py runserver 8001
+```
+
+**Vite на свободном порту** — Vite сам выберет следующий свободный, если указанный занят:
+
+```powershell
+cd frontend
+npx vite --port 5174
+```
+
+**Важно:** `target` в `frontend/vite.config.ts` должен совпадать с портом Django. При запуске бэкенда на `8001` временно измените:
+
+```ts
+proxy: {
+  '/api': {
+    target: 'http://127.0.0.1:8001',
+    changeOrigin: true,
+  },
+},
+```
+
+После изменения `vite.config.ts` dev-сервер перезапускается автоматически. Не коммитьте локальный порт в репозиторий — в git остаётся стандартный `8000`.
 
 ## Документация
 
