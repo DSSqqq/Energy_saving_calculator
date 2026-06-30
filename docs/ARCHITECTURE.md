@@ -42,7 +42,10 @@ energy saving calculator/
 │   │   ├── main.tsx              # точка входа React
 │   │   ├── measures/
 │   │   │   ├── cad/
-│   │   │   │   └── BuildingCadViewer.tsx  # canvas: 3D/2D модель секций здания
+│   │   │   │   ├── BuildingCadViewer.tsx  # canvas: 3D/2D модель секций
+│   │   │   │   ├── footprint.ts           # контур, стыковка секций
+│   │   │   │   ├── geometryMetrics.ts     # площадь стен, объём
+│   │   │   │   └── dimensionDraw.ts       # размерные линии на крыше
 │   │   │   └── windows/          # компоненты мероприятия «Окна»
 │   │   │       ├── BuildingsList.tsx
 │   │   │       ├── SharedParamsForm.tsx
@@ -56,6 +59,7 @@ energy saving calculator/
 │   └── vite.config.ts            # dev-сервер + proxy /api → Django (через .env.local)
 └── docs/
     ├── ARCHITECTURE.md
+    ├── CAD.md
     ├── API.md
     └── MEASURES/
         └── windows.md
@@ -115,7 +119,7 @@ register_measure(MeasureDefinition(
 | Заменить шрифты/стили шаблона | пересобрать `backend/measures/windows/template/base.docx` через `scripts/strip_base.py` |
 | Финансовая модель (NPV/IRR/PBP/DPBP) | `backend/measures/finance/npv.py` |
 | Стили/UX | `frontend/src/App.css`, компоненты в `frontend/src/measures/windows/` |
-| Секции здания, пагинация, 3D CAD | `frontend/src/BuildingDetailsPage.tsx`, `frontend/src/measures/cad/BuildingCadViewer.tsx` |
+| Секции здания, пагинация, 3D CAD | `frontend/src/BuildingDetailsPage.tsx`, `frontend/src/measures/cad/*` — см. [CAD.md](CAD.md) |
 | CORS / продакшен | `backend/config/settings.py` |
 | Прокси dev-сервера | `frontend/vite.config.ts`, `frontend/.env.local` (`VITE_DEV_API_TARGET`) |
 

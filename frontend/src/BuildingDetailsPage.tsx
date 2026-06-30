@@ -1,5 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BuildingCadViewer, type BuildingSectionItem, type SectionSide } from './measures/cad/BuildingCadViewer';
+import {
+  computeJoinOffset,
+  getOppositeOrientation,
+  listJoinSideOptions,
+  type JoinAlignment,
+} from './measures/cad/footprint';
+import { computeBuildingGeometryMetrics, formatMetric } from './measures/cad/geometryMetrics';
 
 interface WindowItem {
   id: number;
@@ -61,6 +68,85 @@ const ROOF_TYPE_OPTIONS = ["Плоская", "Двускатная", "Четыр
 const ROOF_MATERIAL_OPTIONS = ["Рулонная кровля", "Металлочерепица", "Профнастил", "Шифер", "Ж/Б плиты"];
 const SECTIONS_PER_PAGE = 5;
 
+function deriveSectionDimensions(
+  lengthStr: string,
+  widthStr: string,
+  sides: SectionSide[],
+): { length: number; width: number } {
+  let length = parseFloat(lengthStr) || 10;
+  let width = parseFloat(widthStr) || 10;
+
+  const northSouth = sides
+    .filter(s => ['север', 'юг'].includes(s.orientation.toLowerCase()))
+    .map(s => s.length)
+    .filter(n => n > 0);
+  const eastWest = sides
+    .filter(s => ['восток', 'запад'].includes(s.orientation.toLowerCase()))
+    .map(s => s.length)
+    .filter(n => n > 0);
+
+  if (northSouth.length > 0) length = Math.max(...northSouth);
+  if (eastWest.length > 0) width = Math.max(...eastWest);
+
+  return { length, width };
+}
+
+function parseApiError(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback;
+  const record = data as Record<string, unknown>;
+  if (typeof record.detail === 'string') return record.detail;
+  if (Array.isArray(record.detail)) return record.detail.map(String).join('; ');
+  const parts: string[] = [];
+  for (const [key, val] of Object.entries(record)) {
+    if (Array.isArray(val)) parts.push(`${key}: ${val.join(', ')}`);
+    else if (typeof val === 'string') parts.push(`${key}: ${val}`);
+  }
+  return parts.length > 0 ? parts.join('; ') : fallback;
+}
+
+function buildDraftSectionFromForm(
+  buildingId: number,
+  editingSection: BuildingSectionItem | null,
+  fields: {
+    sectionName: string;
+    sectionFloors: string;
+    sectionHeightOuter: string;
+    sectionHeightInner: string;
+    sectionWallMaterial: string;
+    sectionRoofType: string;
+    sectionRoofMaterial: string;
+    sectionLength: string;
+    sectionWidth: string;
+    sectionOffsetX: string;
+    sectionOffsetY: string;
+    sectionSides: SectionSide[];
+  },
+): BuildingSectionItem {
+  const { length, width } = deriveSectionDimensions(
+    fields.sectionLength,
+    fields.sectionWidth,
+    fields.sectionSides,
+  );
+
+  return {
+    id: editingSection?.id ?? -1,
+    building: buildingId,
+    name: fields.sectionName || 'Секция',
+    floors: parseInt(fields.sectionFloors, 10) || 1,
+    height_outer: parseFloat(fields.sectionHeightOuter) || 3.5,
+    height_inner: parseFloat(fields.sectionHeightInner) || 3,
+    wall_material: fields.sectionWallMaterial,
+    roof_type: fields.sectionRoofType,
+    roof_material: fields.sectionRoofMaterial,
+    length,
+    width,
+    offset_x: parseFloat(fields.sectionOffsetX) || 0,
+    offset_y: parseFloat(fields.sectionOffsetY) || 0,
+    sides: fields.sectionSides,
+    created_at: editingSection?.created_at ?? '',
+  };
+}
+
 export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDetailsPageProps) {
   const [buildingInfo, setBuildingInfo] = useState<BuildingInfo | null>(null);
   const [objectInfo, setObjectInfo] = useState<ObjectInfo | null>(null);
@@ -92,6 +178,12 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   const [sectionOffsetX, setSectionOffsetX] = useState('0');
   const [sectionOffsetY, setSectionOffsetY] = useState('0');
   const [sectionSides, setSectionSides] = useState<SectionSide[]>([]);
+  const [joinEnabled, setJoinEnabled] = useState(false);
+  const [joinTargetSectionId, setJoinTargetSectionId] = useState<number | null>(null);
+  const [joinTargetSide, setJoinTargetSide] = useState('Восток');
+  const [joinAttachSide, setJoinAttachSide] = useState('Запад');
+  const [joinAlignment, setJoinAlignment] = useState<JoinAlignment>('center');
+  const [joinSlide, setJoinSlide] = useState('0');
   const [sectionFormError, setSectionFormError] = useState('');
   const [sectionSubmitting, setSectionSubmitting] = useState(false);
 
@@ -117,8 +209,8 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
   const [doorSubmitting, setDoorSubmitting] = useState(false);
 
   // Fetch all building elements and details
-  const fetchAllData = async () => {
-    setLoading(true);
+  const fetchAllData = async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     setError('');
     try {
       const promises = [
@@ -149,7 +241,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     } catch (err: any) {
       setError(err.message || 'Ошибка подключения к серверу');
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   };
 
@@ -193,6 +285,95 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     }
   }, [sectionPage, sections, expandedSectionId]);
 
+  // Черновик секции для live-preview в 3D CAD пока открыта форма редактирования
+  const formDraftFields = useMemo(() => ({
+    sectionName,
+    sectionFloors,
+    sectionHeightOuter,
+    sectionHeightInner,
+    sectionWallMaterial,
+    sectionRoofType,
+    sectionRoofMaterial,
+    sectionLength,
+    sectionWidth,
+    sectionOffsetX,
+    sectionOffsetY,
+    sectionSides,
+  }), [
+    sectionName, sectionFloors, sectionHeightOuter, sectionHeightInner,
+    sectionWallMaterial, sectionRoofType, sectionRoofMaterial,
+    sectionLength, sectionWidth, sectionOffsetX, sectionOffsetY, sectionSides,
+  ]);
+
+  const joinTargetCandidates = useMemo(
+    () => sections.filter(s => s.id !== editingSection?.id),
+    [sections, editingSection],
+  );
+
+  const joinTargetSection = joinTargetSectionId !== null
+    ? sections.find(s => s.id === joinTargetSectionId) ?? null
+    : null;
+
+  const joinTargetSideOptions = joinTargetSection
+    ? listJoinSideOptions(joinTargetSection)
+    : [];
+
+  const joinAttachSideOptions = listJoinSideOptions(
+    buildDraftSectionFromForm(buildingId, editingSection, formDraftFields),
+  );
+
+  useEffect(() => {
+    if (!isSectionFormOpen || !joinEnabled || !joinTargetSection) return;
+
+    const draft = buildDraftSectionFromForm(buildingId, editingSection, {
+      ...formDraftFields,
+      sectionOffsetX: '0',
+      sectionOffsetY: '0',
+    });
+
+    const offsets = computeJoinOffset(
+      draft,
+      joinTargetSection,
+      joinTargetSide,
+      joinAttachSide,
+      joinAlignment,
+      parseFloat(joinSlide) || 0,
+    );
+    if (!offsets) return;
+
+    const ox = offsets.offset_x.toFixed(2);
+    const oz = offsets.offset_y.toFixed(2);
+    setSectionOffsetX(prev => (prev === ox ? prev : ox));
+    setSectionOffsetY(prev => (prev === oz ? prev : oz));
+  }, [
+    isSectionFormOpen,
+    joinEnabled,
+    joinTargetSection,
+    joinTargetSide,
+    joinAttachSide,
+    joinAlignment,
+    joinSlide,
+    buildingId,
+    editingSection,
+    formDraftFields,
+  ]);
+
+  const cadSections = useMemo((): BuildingSectionItem[] => {
+    if (!isSectionFormOpen) return sections;
+
+    const draft = buildDraftSectionFromForm(buildingId, editingSection, formDraftFields);
+
+    if (editingSection) {
+      return sections.map(s => (s.id === editingSection.id ? draft : s));
+    }
+    return [...sections, draft];
+  }, [sections, isSectionFormOpen, editingSection, buildingId, formDraftFields]);
+
+  const geometryMetrics = useMemo(
+    () => computeBuildingGeometryMetrics(cadSections),
+    [cadSections],
+  );
+
   // --- Section Actions ---
   const handleOpenCreateSection = () => {
     setEditingSection(null);
@@ -206,14 +387,15 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     setSectionRoofMaterial(ROOF_MATERIAL_OPTIONS[0]);
     setSectionLength('12');
     setSectionWidth('8');
-    
-    // Automatically calculate offset_x to place next section side-by-side
-    let nextOffsetX = 0;
-    if (sections.length > 0) {
-      const lastSec = sections[sections.length - 1];
-      nextOffsetX = lastSec.offset_x + lastSec.length;
-    }
-    setSectionOffsetX(nextOffsetX.toString());
+
+    const lastSec = sections.length > 0 ? sections[sections.length - 1] : null;
+    setJoinEnabled(sections.length > 0);
+    setJoinTargetSectionId(lastSec?.id ?? null);
+    setJoinTargetSide('Восток');
+    setJoinAttachSide('Запад');
+    setJoinAlignment('center');
+    setJoinSlide('0');
+    setSectionOffsetX('0');
     setSectionOffsetY('0');
 
     // Generate default 4 sides
@@ -243,6 +425,12 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     setSectionOffsetX(sec.offset_x.toString());
     setSectionOffsetY(sec.offset_y.toString());
     setSectionSides(sec.sides || []);
+    setJoinEnabled(false);
+    setJoinTargetSectionId(null);
+    setJoinTargetSide('Восток');
+    setJoinAttachSide('Запад');
+    setJoinAlignment('center');
+    setJoinSlide('0');
     setSectionFormError('');
     setIsSectionFormOpen(true);
   };
@@ -284,21 +472,59 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
 
   const handleSectionFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const floors = parseInt(sectionFloors);
+
+    if (!sectionName.trim()) {
+      setSectionFormError('Укажите название участка / секции.');
+      setActiveModalTab('main');
+      return;
+    }
+
+    const floors = parseInt(sectionFloors, 10);
     const hOuter = parseFloat(sectionHeightOuter);
     const hInner = parseFloat(sectionHeightInner);
-    const l = parseFloat(sectionLength);
-    const w = parseFloat(sectionWidth);
+    const { length: l, width: w } = deriveSectionDimensions(sectionLength, sectionWidth, sectionSides);
     const ox = parseFloat(sectionOffsetX);
     const oy = parseFloat(sectionOffsetY);
 
-    if (isNaN(floors) || floors <= 0 || isNaN(hOuter) || hOuter <= 0 || isNaN(hInner) || hInner <= 0 || isNaN(l) || l <= 0 || isNaN(w) || w <= 0) {
-      setSectionFormError('Пожалуйста, введите корректные положительные числовые значения для размеров и высот.');
+    if (isNaN(floors) || floors <= 0) {
+      setSectionFormError('Укажите корректное количество этажей (вкладка «Высоты и этажность»).');
+      setActiveModalTab('heights');
+      return;
+    }
+
+    if (isNaN(hOuter) || hOuter <= 0 || isNaN(hInner) || hInner <= 0) {
+      setSectionFormError('Укажите корректные высоты секции (вкладка «Высоты и этажность»).');
+      setActiveModalTab('heights');
+      return;
+    }
+
+    if (isNaN(l) || l <= 0 || isNaN(w) || w <= 0) {
+      setSectionFormError('Укажите корректные габариты секции (длина и ширина > 0).');
+      setActiveModalTab('main');
       return;
     }
 
     if (hInner > hOuter) {
       setSectionFormError('Высота внутри не может быть больше высоты снаружи.');
+      setActiveModalTab('heights');
+      return;
+    }
+
+    if (joinEnabled && joinTargetCandidates.length > 0 && joinTargetSectionId === null) {
+      setSectionFormError('Выберите секцию, к которой нужно пристыковать текущую.');
+      setActiveModalTab('main');
+      return;
+    }
+
+    const invalidSide = sectionSides.find(s => !s.name.trim() || !(Number(s.length) > 0));
+    if (invalidSide) {
+      setSectionFormError('У каждой стороны должны быть название и длина больше 0 (вкладка «Периметр и стороны»).');
+      setActiveModalTab('sides');
+      return;
+    }
+
+    if (editingSection && (!Number.isFinite(editingSection.id) || editingSection.id <= 0)) {
+      setSectionFormError('Не удалось определить участок для сохранения. Закройте форму и откройте редактирование снова.');
       return;
     }
 
@@ -306,10 +532,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
     setSectionSubmitting(true);
 
     const url = editingSection ? `/api/building-sections/${editingSection.id}/` : '/api/building-sections/';
-    const method = editingSection ? 'PUT' : 'POST';
+    const method = editingSection ? 'PATCH' : 'POST';
     const payload = {
       building: buildingId,
-      name: sectionName || 'Секция здания',
+      name: sectionName.trim() || 'Секция здания',
       floors,
       height_outer: hOuter,
       height_inner: hInner,
@@ -320,7 +546,10 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
       width: w,
       offset_x: isNaN(ox) ? 0 : ox,
       offset_y: isNaN(oy) ? 0 : oy,
-      sides: sectionSides
+      sides: sectionSides.map(s => ({
+        ...s,
+        length: Number(s.length),
+      })),
     };
 
     try {
@@ -331,12 +560,19 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || 'Ошибка сохранения участка здания');
+        let message = 'Ошибка сохранения участка здания';
+        try {
+          const data = await res.json();
+          message = parseApiError(data, message);
+        } catch {
+          // ответ не JSON
+        }
+        throw new Error(message);
       }
 
+      setEditingSection(null);
       setIsSectionFormOpen(false);
-      fetchAllData();
+      await fetchAllData({ silent: true });
     } catch (err: any) {
       setSectionFormError(err.message || 'Ошибка отправки запроса');
     } finally {
@@ -528,11 +764,11 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
 
       {/* --- Section Form Modal --- */}
       {isSectionFormOpen && (
-        <div className="modal-overlay" onClick={() => setIsSectionFormOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setIsSectionFormOpen(false); setEditingSection(null); }}>
           <div className="modal-card modal-card--large" onClick={(e) => e.stopPropagation()}>
             <header className="block__header" style={{ marginBottom: '1.5rem' }}>
               <h2>{editingSection ? 'Редактировать участок здания' : 'Добавить участок здания'}</h2>
-              <button type="button" className="modal-close-btn" onClick={() => setIsSectionFormOpen(false)} title="Закрыть">
+              <button type="button" className="modal-close-btn" onClick={() => { setIsSectionFormOpen(false); setEditingSection(null); }} title="Закрыть">
                 ✕
               </button>
             </header>
@@ -571,7 +807,7 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
               </button>
             </div>
 
-            <form onSubmit={handleSectionFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form noValidate onSubmit={handleSectionFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {activeModalTab === 'main' && (
                 <>
                   <div className="field">
@@ -613,30 +849,126 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
                   <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <h4 style={{ margin: '0 0 0.75rem 0', color: '#2ed38a', fontSize: '0.9rem' }}>Стыковка секций в 3D пространстве</h4>
                     <p style={{ margin: '0 0 1rem 0', color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                      Для корректного построения 3D CAD модели из нескольких участков укажите координаты смещения. Например, если первая секция имеет длину 12м, установите смещение по оси X второй секции равным 12, чтобы они состыковались вплотную.
+                      Выберите секцию и стороны для стыковки. Для параллельных стен задайте позицию и сдвиг вдоль стены — секции встанут вплотную, без «диагонального» угла.
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                      <div className="field">
-                        <span>Смещение по оси X (м)</span>
-                        <input 
-                          type="number" 
-                          step="0.1" 
-                          value={sectionOffsetX} 
-                          onChange={(e) => setSectionOffsetX(e.target.value)} 
-                          placeholder="0" 
-                        />
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: '0.9rem' }}>
+                      <input
+                        type="checkbox"
+                        className="checkbox--primary"
+                        checked={joinEnabled}
+                        onChange={(e) => {
+                          const enabled = e.target.checked;
+                          setJoinEnabled(enabled);
+                          if (enabled) {
+                            if (joinTargetCandidates.length > 0 && joinTargetSectionId === null) {
+                              const target = joinTargetCandidates[0];
+                              setJoinTargetSectionId(target.id);
+                              const opts = listJoinSideOptions(target);
+                              const firstSide = opts[0]?.value ?? 'Восток';
+                              setJoinTargetSide(firstSide);
+                              setJoinAttachSide(getOppositeOrientation(firstSide));
+                            }
+                          } else {
+                            setSectionOffsetX('0');
+                            setSectionOffsetY('0');
+                          }
+                        }}
+                        disabled={joinTargetCandidates.length === 0}
+                      />
+                      Пристыковать к существующей секции
+                    </label>
+
+                    {joinEnabled && joinTargetCandidates.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="field">
+                          <span>Секция для стыковки *</span>
+                          <select
+                            value={joinTargetSectionId ?? ''}
+                            onChange={(e) => {
+                              const id = parseInt(e.target.value, 10);
+                              setJoinTargetSectionId(Number.isFinite(id) ? id : null);
+                              const target = sections.find(s => s.id === id);
+                              if (target) {
+                                const opts = listJoinSideOptions(target);
+                                const firstSide = opts[0]?.value ?? 'Восток';
+                                setJoinTargetSide(firstSide);
+                                setJoinAttachSide(getOppositeOrientation(firstSide));
+                              }
+                            }}
+                          >
+                            {joinTargetCandidates.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                          <div className="field">
+                            <span>Сторона выбранной секции (куда) *</span>
+                            <select
+                              value={joinTargetSide}
+                              onChange={(e) => {
+                                setJoinTargetSide(e.target.value);
+                                setJoinAttachSide(getOppositeOrientation(e.target.value));
+                              }}
+                            >
+                              {joinTargetSideOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <span>Сторона текущей секции (чем) *</span>
+                            <select
+                              value={joinAttachSide}
+                              onChange={(e) => setJoinAttachSide(e.target.value)}
+                            >
+                              {joinAttachSideOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                          <div className="field">
+                            <span>Позиция вдоль стены</span>
+                            <select
+                              value={joinAlignment}
+                              onChange={(e) => setJoinAlignment(e.target.value as JoinAlignment)}
+                            >
+                              <option value="start">От начала стены</option>
+                              <option value="center">По центру (рекомендуется)</option>
+                              <option value="end">От конца стены</option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <span>Сдвиг вдоль стены (м)</span>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={joinSlide}
+                              onChange={(e) => setJoinSlide(e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '0.82rem', color: 'rgba(46, 211, 138, 0.85)', background: 'rgba(46, 211, 138, 0.08)', border: '1px solid rgba(46, 211, 138, 0.2)', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
+                          Смещение: X = {sectionOffsetX} м, Y/Z = {sectionOffsetY} м
+                          <div style={{ marginTop: '0.35rem', color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem' }}>
+                            Боковая стыковка: противоположные стороны (Запад→Восток, Север→Юг). Г-образная: перпендикулярные (Юг→Восток).
+                          </div>
+                        </div>
                       </div>
-                      <div className="field">
-                        <span>Смещение по оси Y/Z (м)</span>
-                        <input 
-                          type="number" 
-                          step="0.1" 
-                          value={sectionOffsetY} 
-                          onChange={(e) => setSectionOffsetY(e.target.value)} 
-                          placeholder="0" 
-                        />
+                    )}
+
+                    {!joinEnabled && (
+                      <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)' }}>
+                        Секция размещается в начале координат (0, 0). Включите стыковку, если нужно присоединить к другому участку.
                       </div>
-                    </div>
+                    )}
                   </div>
                 </>
               )}
@@ -770,11 +1102,18 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
-                  * Обязательные поля
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '55%' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
+                    * Обязательные поля
+                  </span>
+                  {sectionFormError && (
+                    <div className="panel panel--error" style={{ margin: 0, fontSize: '0.85rem' }}>
+                      {sectionFormError}
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button type="button" className="btn btn--ghost" onClick={() => setIsSectionFormOpen(false)}>
+                  <button type="button" className="btn btn--ghost" onClick={() => { setIsSectionFormOpen(false); setEditingSection(null); }}>
                     Отмена
                   </button>
                   <button type="submit" className="btn btn--primary" disabled={sectionSubmitting}>
@@ -1113,8 +1452,89 @@ export function BuildingDetailsPage({ buildingId, objectId, onBack }: BuildingDe
               </div>
 
               {/* Right Column: 3D CAD Canvas Viewer */}
-              <BuildingCadViewer sections={sections} />
+              <BuildingCadViewer sections={cadSections} />
             </div>
+          </section>
+
+          <section className="block geometry-metrics-block" style={{ marginBottom: '2.5rem' }}>
+            <header className="block__header" style={{ marginBottom: '1.25rem' }}>
+              <h2 style={{ margin: 0 }}>Расчёт геометрии здания</h2>
+              <p className="geometry-metrics-block__hint">
+                Площадь стен — по длине и высоте каждой стороны контура; стыки между секциями не учитываются.
+                Объём — площадь контура секции × высота (не по габаритному прямоугольнику).
+              </p>
+            </header>
+
+            {cadSections.length === 0 ? (
+              <div className="geometry-metrics-block__empty">
+                Добавьте секции здания, чтобы увидеть расчёт.
+              </div>
+            ) : (
+              <>
+                <ul className="geometry-metrics-kpis">
+                  <li className="geometry-metrics-kpi">
+                    <span className="geometry-metrics-kpi__label">Площадь наружных стен</span>
+                    <strong className="geometry-metrics-kpi__value">
+                      {formatMetric(geometryMetrics.totalExteriorWallArea)} м²
+                    </strong>
+                  </li>
+                  <li className="geometry-metrics-kpi">
+                    <span className="geometry-metrics-kpi__label">Строительный объём</span>
+                    <strong className="geometry-metrics-kpi__value">
+                      {formatMetric(geometryMetrics.totalVolume)} м³
+                    </strong>
+                  </li>
+                  <li className="geometry-metrics-kpi">
+                    <span className="geometry-metrics-kpi__label">Площадь контуров</span>
+                    <strong className="geometry-metrics-kpi__value">
+                      {formatMetric(geometryMetrics.totalFootprintArea)} м²
+                    </strong>
+                  </li>
+                  {geometryMetrics.totalJunctionWallArea > 0 && (
+                    <li className="geometry-metrics-kpi geometry-metrics-kpi--muted">
+                      <span className="geometry-metrics-kpi__label">Исключено (стыки секций)</span>
+                      <strong className="geometry-metrics-kpi__value">
+                        {formatMetric(geometryMetrics.totalJunctionWallArea)} м²
+                      </strong>
+                    </li>
+                  )}
+                </ul>
+
+                {geometryMetrics.sections.length > 1 && (
+                  <div className="results-table-wrap" style={{ marginTop: '1.25rem' }}>
+                    <table className="results-table geometry-metrics-table">
+                      <thead>
+                        <tr>
+                          <th>Секция</th>
+                          <th>Контур, м²</th>
+                          <th>Высота, м</th>
+                          <th>Стены, м²</th>
+                          <th>Объём, м³</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {geometryMetrics.sections.map(row => (
+                          <tr key={row.sectionId}>
+                            <td>{row.sectionName}</td>
+                            <td>{formatMetric(row.footprintArea)}</td>
+                            <td>{formatMetric(row.height, 1)}</td>
+                            <td>{formatMetric(row.exteriorWallArea)}</td>
+                            <td>{formatMetric(row.volume)}</td>
+                          </tr>
+                        ))}
+                        <tr className="results-table__total">
+                          <td>Итого</td>
+                          <td>{formatMetric(geometryMetrics.totalFootprintArea)}</td>
+                          <td>—</td>
+                          <td>{formatMetric(geometryMetrics.totalExteriorWallArea)}</td>
+                          <td>{formatMetric(geometryMetrics.totalVolume)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
           </section>
 
           {/* --- Windows Block --- */}

@@ -184,3 +184,9 @@ class BuildingSectionViewSet(ModelViewSet):
         if building.object.user != self.request.user:
             raise PermissionDenied("У вас нет прав для добавления секции в это здание.")
         serializer.save()
+
+    def perform_update(self, serializer):
+        building = serializer.instance.building
+        if building.object.user != self.request.user:
+            raise PermissionDenied("У вас нет прав для изменения этой секции.")
+        serializer.save()

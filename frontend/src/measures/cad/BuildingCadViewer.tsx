@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  buildSectionFootprint,
+  footprintGeometryKey,
+  getFootprintBounds,
+  type SectionFootprint,
+} from './footprint';
+import { buildRoofDimensions, drawRoofDimensionWithWitness, type RoofDimension } from './dimensionDraw';
 
 export interface SectionSide {
   id: string;
@@ -29,6 +36,163 @@ interface BuildingCadViewerProps {
   sections: BuildingSectionItem[];
 }
 
+function toNum(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : parseFloat(String(value));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeSection(sec: BuildingSectionItem): BuildingSectionItem {
+  return {
+    ...sec,
+    floors: Math.max(1, Math.round(toNum(sec.floors, 1))),
+    height_outer: toNum(sec.height_outer, 3.5),
+    height_inner: toNum(sec.height_inner, 3),
+    length: toNum(sec.length, 10),
+    width: toNum(sec.width, 10),
+    offset_x: toNum(sec.offset_x, 0),
+    offset_y: toNum(sec.offset_y, 0),
+  };
+}
+
+function getGeometryKey(sections: BuildingSectionItem[]): string {
+  return sections.map(s => footprintGeometryKey(s)).join('|');
+}
+
+function getBoundsSpan(sections: BuildingSectionItem[]): number {
+  const footprints = sections.map(buildSectionFootprint);
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
+  const bounds = getFootprintBounds(footprints);
+  if (Number.isFinite(bounds.minX)) {
+    minX = bounds.minX;
+    maxX = bounds.maxX;
+    minZ = bounds.minZ;
+    maxZ = bounds.maxZ;
+  }
+  sections.forEach(sec => {
+    const h = toNum(sec.height_outer, 3.5);
+    if (h > maxY) maxY = h;
+  });
+  return Math.max(maxX - minX, maxZ - minZ, maxY, 1);
+}
+
+function computeWallNormal(v0: { x: number; z: number }, v1: { x: number; z: number }) {
+  const ex = v1.x - v0.x;
+  const ez = v1.z - v0.z;
+  const len = Math.hypot(ex, ez) || 1;
+  // Внешняя нормаль в плоскости XZ (перпендикуляр ребру)
+  return { x: ez / len, y: 0, z: -ex / len };
+}
+
+function polygonCentroid(vertices: { x: number; z: number }[]) {
+  let sx = 0;
+  let sz = 0;
+  vertices.forEach(v => {
+    sx += v.x;
+    sz += v.z;
+  });
+  return { x: sx / vertices.length, z: sz / vertices.length };
+}
+
+function addSectionFaces(
+  faces: Face[],
+  sec: BuildingSectionItem,
+  footprint: SectionFootprint,
+  wallColor: { r: number; g: number; b: number },
+  roofColor: { r: number; g: number; b: number },
+) {
+  const h = sec.height_outer;
+  const verts = footprint.vertices;
+  const n = verts.length;
+
+  // Пол
+  faces.push({
+    points: verts.map(v => ({ x: v.x, y: 0, z: v.z })),
+    color: { r: 40, g: 50, b: 45 },
+    normal: { x: 0, y: -1, z: 0 },
+    sectionName: sec.name,
+  });
+
+  // Стены по каждому ребру контура
+  footprint.edges.forEach(edge => {
+    const v0 = verts[edge.v0];
+    const v1 = verts[edge.v1];
+    const normal = computeWallNormal(v0, v1);
+    faces.push({
+      points: [
+        { x: v0.x, y: 0, z: v0.z },
+        { x: v1.x, y: 0, z: v1.z },
+        { x: v1.x, y: h, z: v1.z },
+        { x: v0.x, y: h, z: v0.z },
+      ],
+      color: wallColor,
+      normal,
+      label: edge.label,
+      floors: sec.floors,
+      height: h,
+    });
+  });
+
+  const roofType = sec.roof_type.toLowerCase();
+  const topVerts = verts.map(v => ({ x: v.x, y: h, z: v.z }));
+
+  if (roofType === 'двускатная' && n >= 4) {
+    const ridgeY = h + 1.8;
+    const c = polygonCentroid(verts);
+    const ridge = { x: c.x, y: ridgeY, z: c.z };
+    for (let i = 0; i < n; i++) {
+      const a = verts[i];
+      const b = verts[(i + 1) % n];
+      faces.push({
+        points: [
+          { x: a.x, y: h, z: a.z },
+          { x: b.x, y: h, z: b.z },
+          ridge,
+        ],
+        color: roofColor,
+        normal: { x: 0, y: 0.7, z: 0.7 },
+        isRoof: true,
+      });
+    }
+  } else if ((roofType === 'четырехскатная' || roofType === 'мансардная') && n >= 4) {
+    const ridgeY = h + 2.0;
+    const c = polygonCentroid(verts);
+    const ridge = { x: c.x, y: ridgeY, z: c.z };
+    for (let i = 0; i < n; i++) {
+      const a = verts[i];
+      const b = verts[(i + 1) % n];
+      faces.push({
+        points: [
+          { x: a.x, y: h, z: a.z },
+          { x: b.x, y: h, z: b.z },
+          ridge,
+        ],
+        color: roofColor,
+        normal: { x: 0, y: 0.7, z: 0.7 },
+        isRoof: true,
+      });
+    }
+  } else {
+    faces.push({
+      points: topVerts,
+      color: roofColor,
+      normal: { x: 0, y: 1, z: 0 },
+      isRoof: true,
+    });
+  }
+}
+
+interface Face {
+  points: { x: number; y: number; z: number }[];
+  color: { r: number; g: number; b: number };
+  normal: { x: number; y: number; z: number };
+  label?: string;
+  isRoof?: boolean;
+  floors?: number;
+  height?: number;
+  sectionName?: string;
+  avgZ?: number;
+}
+
 export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [displayMode, setDisplayMode] = useState<'solid' | 'wireframe' | 'top'>('solid');
@@ -41,6 +205,30 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
   // Dragging state
   const isDragging = useRef(false);
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const lastGeometryKey = useRef('');
+
+  const normalizedSections = useMemo(
+    () => sections.map(normalizeSection),
+    [sections],
+  );
+
+  const geometryKey = useMemo(
+    () => getGeometryKey(normalizedSections),
+    [normalizedSections],
+  );
+
+  // Подгоняем масштаб при изменении габаритов, чтобы модель всегда была видна
+  useEffect(() => {
+    if (normalizedSections.length === 0 || geometryKey === lastGeometryKey.current) return;
+    lastGeometryKey.current = geometryKey;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const maxSpan = getBoundsSpan(normalizedSections);
+    const fitZoom = Math.min(60, Math.max(8, Math.min(canvas.width, canvas.height) * 0.42 / maxSpan));
+    setZoom(fitZoom);
+  }, [geometryKey, normalizedSections]);
 
   // Reset camera view
   const handleResetCamera = () => {
@@ -114,7 +302,7 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
     // Clear background
     ctx.clearRect(0, 0, width, height);
 
-    if (sections.length === 0) {
+    if (normalizedSections.length === 0) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.font = '14px Inter, sans-serif';
       ctx.textAlign = 'center';
@@ -123,17 +311,16 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
     }
 
     // Calculate bounding box to center the model
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    sections.forEach(sec => {
-      const x1 = sec.offset_x;
-      const x2 = sec.offset_x + sec.length;
-      const z1 = sec.offset_y;
-      const z2 = sec.offset_y + sec.width;
-      if (x1 < minX) minX = x1;
-      if (x2 > maxX) maxX = x2;
-      if (z1 < minZ) minZ = z1;
-      if (z2 > maxZ) maxZ = z2;
-    });
+    const footprints = normalizedSections.map(buildSectionFootprint);
+    const bounds = getFootprintBounds(footprints);
+    let minX = bounds.minX;
+    let maxX = bounds.maxX;
+    let minZ = bounds.minZ;
+    let maxZ = bounds.maxZ;
+
+    if (!Number.isFinite(minX)) {
+      minX = maxX = minZ = maxZ = 0;
+    }
 
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
@@ -171,160 +358,13 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
       };
     };
 
-    // Prepare faces for Painter's algorithm
-    interface Face {
-      points: { x: number; y: number; z: number }[];
-      color: { r: number; g: number; b: number };
-      normal: { x: number; y: number; z: number };
-      label?: string;
-      isRoof?: boolean;
-      floors?: number;
-      height?: number;
-      sectionName?: string;
-      avgZ?: number;
-    }
-
     const faces: Face[] = [];
 
-    // Build faces for each section
-    sections.forEach(sec => {
-      const x1 = sec.offset_x;
-      const x2 = sec.offset_x + sec.length;
-      const z1 = sec.offset_y;
-      const z2 = sec.offset_y + sec.width;
-      const h = sec.height_outer;
+    normalizedSections.forEach((sec, idx) => {
+      const footprint = footprints[idx];
       const wallColor = getMaterialColor(sec.wall_material);
       const roofColor = getRoofColor(sec.roof_material);
-
-      // Find specific sides for labels if provided
-      const getSideLabel = (defaultOrient: string, defaultLen: number) => {
-        const custom = sec.sides?.find(s => s.orientation.toLowerCase() === defaultOrient.toLowerCase());
-        if (custom) {
-          return `${custom.orientation}: ${custom.length}м (${custom.name})`;
-        }
-        return `${defaultOrient}: ${defaultLen}м`;
-      };
-
-      // 1. Bottom face (ground floor)
-      faces.push({
-        points: [{ x: x1, y: 0, z: z1 }, { x: x2, y: 0, z: z1 }, { x: x2, y: 0, z: z2 }, { x: x1, y: 0, z: z2 }],
-        color: { r: 40, g: 50, b: 45 },
-        normal: { x: 0, y: -1, z: 0 },
-        sectionName: sec.name
-      });
-
-      // 2. South Wall (z = z2)
-      faces.push({
-        points: [{ x: x1, y: 0, z: z2 }, { x: x2, y: 0, z: z2 }, { x: x2, y: h, z: z2 }, { x: x1, y: h, z: z2 }],
-        color: wallColor,
-        normal: { x: 0, y: 0, z: 1 },
-        label: getSideLabel('Юг', sec.length),
-        floors: sec.floors,
-        height: h
-      });
-
-      // 3. North Wall (z = z1)
-      faces.push({
-        points: [{ x: x2, y: 0, z: z1 }, { x: x1, y: 0, z: z1 }, { x: x1, y: h, z: z1 }, { x: x2, y: h, z: z1 }],
-        color: wallColor,
-        normal: { x: 0, y: 0, z: -1 },
-        label: getSideLabel('Север', sec.length),
-        floors: sec.floors,
-        height: h
-      });
-
-      // 4. West Wall (x = x1)
-      faces.push({
-        points: [{ x: x1, y: 0, z: z1 }, { x: x1, y: 0, z: z2 }, { x: x1, y: h, z: z2 }, { x: x1, y: h, z: z1 }],
-        color: wallColor,
-        normal: { x: -1, y: 0, z: 0 },
-        label: getSideLabel('Запад', sec.width),
-        floors: sec.floors,
-        height: h
-      });
-
-      // 5. East Wall (x = x2)
-      faces.push({
-        points: [{ x: x2, y: 0, z: z2 }, { x: x2, y: 0, z: z1 }, { x: x2, y: h, z: z1 }, { x: x2, y: h, z: z2 }],
-        color: wallColor,
-        normal: { x: 1, y: 0, z: 0 },
-        label: getSideLabel('Восток', sec.width),
-        floors: sec.floors,
-        height: h
-      });
-
-      // 6. Roof Geometry
-      if (sec.roof_type.toLowerCase() === 'двускатная') {
-        const ridgeY = h + 1.8; // roof ridge height
-        const midZ = (z1 + z2) / 2;
-        // South slope
-        faces.push({
-          points: [{ x: x1, y: h, z: z2 }, { x: x2, y: h, z: z2 }, { x: x2, y: ridgeY, z: midZ }, { x: x1, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: 0, y: 0.7, z: 0.7 },
-          isRoof: true
-        });
-        // North slope
-        faces.push({
-          points: [{ x: x2, y: h, z: z1 }, { x: x1, y: h, z: z1 }, { x: x1, y: ridgeY, z: midZ }, { x: x2, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: 0, y: 0.7, z: -0.7 },
-          isRoof: true
-        });
-        // West gable
-        faces.push({
-          points: [{ x: x1, y: h, z: z1 }, { x: x1, y: h, z: z2 }, { x: x1, y: ridgeY, z: midZ }],
-          color: wallColor,
-          normal: { x: -1, y: 0, z: 0 }
-        });
-        // East gable
-        faces.push({
-          points: [{ x: x2, y: h, z: z2 }, { x: x2, y: h, z: z1 }, { x: x2, y: ridgeY, z: midZ }],
-          color: wallColor,
-          normal: { x: 1, y: 0, z: 0 }
-        });
-      } else if (sec.roof_type.toLowerCase() === 'четырехскатная' || sec.roof_type.toLowerCase() === 'мансардная') {
-        const ridgeY = h + 2.0;
-        const midX1 = x1 + sec.length * 0.25;
-        const midX2 = x2 - sec.length * 0.25;
-        const midZ = (z1 + z2) / 2;
-        // South slope
-        faces.push({
-          points: [{ x: x1, y: h, z: z2 }, { x: x2, y: h, z: z2 }, { x: midX2, y: ridgeY, z: midZ }, { x: midX1, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: 0, y: 0.7, z: 0.7 },
-          isRoof: true
-        });
-        // North slope
-        faces.push({
-          points: [{ x: x2, y: h, z: z1 }, { x: x1, y: h, z: z1 }, { x: midX1, y: ridgeY, z: midZ }, { x: midX2, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: 0, y: 0.7, z: -0.7 },
-          isRoof: true
-        });
-        // West slope
-        faces.push({
-          points: [{ x: x1, y: h, z: z1 }, { x: x1, y: h, z: z2 }, { x: midX1, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: -0.7, y: 0.7, z: 0 },
-          isRoof: true
-        });
-        // East slope
-        faces.push({
-          points: [{ x: x2, y: h, z: z2 }, { x: x2, y: h, z: z1 }, { x: midX2, y: ridgeY, z: midZ }],
-          color: roofColor,
-          normal: { x: 0.7, y: 0.7, z: 0 },
-          isRoof: true
-        });
-      } else {
-        // Flat roof
-        faces.push({
-          points: [{ x: x1, y: h, z: z2 }, { x: x2, y: h, z: z2 }, { x: x2, y: h, z: z1 }, { x: x1, y: h, z: z1 }],
-          color: roofColor,
-          normal: { x: 0, y: 1, z: 0 },
-          isRoof: true
-        });
-      }
+      addSectionFaces(faces, sec, footprint, wallColor, roofColor);
     });
 
     // Calculate projected coordinates and average Z depth for sorting
@@ -401,34 +441,10 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
         }
       }
 
-      // Draw Labels on visible walls
-      if (face.label && displayMode !== 'top') {
-        // Check if face is pointing towards camera
-        // Camera vector in world coords is roughly based on yaw/pitch
-        const camX = Math.sin(yaw);
-        const camZ = -Math.cos(yaw);
-        const dotCam = face.normal.x * camX + face.normal.z * camZ;
-
-        // If dotCam < 0, wall is facing the camera
-        if (dotCam < -0.1) {
-          // Calculate center of the top edge of the wall
-          const midX = (face.points[2].x + face.points[3].x) / 2;
-          const midY = (face.points[2].y + face.points[3].y) / 2;
-          const midZ = (face.points[2].z + face.points[3].z) / 2;
-          const labelPos = project(midX, midY, midZ);
-
-          ctx.fillStyle = '#2ed38a';
-          ctx.font = 'bold 12px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(face.label, labelPos.x, labelPos.y - 8);
-        }
-      }
-
-      // In top view, draw section name in center
+      // Название секции в 2D-плане
       if (displayMode === 'top' && face.sectionName) {
-        const midX = (face.points[0].x + face.points[2].x) / 2;
-        const midZ = (face.points[0].z + face.points[2].z) / 2;
-        const labelPos = project(midX, 0, midZ);
+        const c = polygonCentroid(face.points.map(p => ({ x: p.x, z: p.z })));
+        const labelPos = project(c.x, 0, c.z);
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 14px Inter, sans-serif';
@@ -437,7 +453,19 @@ export function BuildingCadViewer({ sections }: BuildingCadViewerProps) {
       }
     });
 
-  }, [sections, displayMode, yaw, pitch, zoom]);
+    // Размерные линии на крыше каждой секции
+    const allDimensions: RoofDimension[] = [];
+    normalizedSections.forEach((sec, idx) => {
+      const footprint = footprints[idx];
+      const inset = displayMode === 'top' ? 0.55 : 0.4;
+      allDimensions.push(...buildRoofDimensions(footprint, sec.height_outer, inset));
+    });
+
+    allDimensions.forEach(dim => {
+      drawRoofDimensionWithWitness(ctx, project, dim, zoom);
+    });
+
+  }, [normalizedSections, displayMode, yaw, pitch, zoom]);
 
   return (
     <div className="cad-viewer-card">

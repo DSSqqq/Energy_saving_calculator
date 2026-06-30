@@ -346,6 +346,40 @@
   color: #121e1b;
 }
 
+.checkbox--primary {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  flex-shrink: 0;
+  border: 2px solid rgba(46, 211, 138, 0.45);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkbox--primary:hover:not(:disabled) {
+  border-color: #2ed38a;
+  box-shadow: 0 0 0 3px rgba(46, 211, 138, 0.15);
+}
+
+.checkbox--primary:checked {
+  background-color: #2ed38a;
+  border-color: #2ed38a;
+  box-shadow: 0 2px 8px rgba(46, 211, 138, 0.35);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23121e1b'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-size: 0.85rem;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.checkbox--primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .btn--ghost {
   background: transparent;
   color: #2ed38a;
@@ -1094,6 +1128,84 @@
   .cad-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.geometry-metrics-block {
+  background: rgba(18, 30, 27, 0.45);
+  border: 1px solid rgba(46, 211, 138, 0.35);
+  border-radius: 20px;
+  padding: 1.5rem 1.75rem;
+}
+
+.geometry-metrics-block__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 52rem;
+  line-height: 1.45;
+}
+
+.geometry-metrics-block__empty {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.geometry-metrics-kpis {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.geometry-metrics-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.15rem;
+  background: rgba(46, 211, 138, 0.06);
+  border: 1px solid rgba(46, 211, 138, 0.2);
+  border-radius: 12px;
+}
+
+.geometry-metrics-kpi--muted {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.geometry-metrics-kpi__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.geometry-metrics-kpi__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #2ed38a;
+}
+
+.geometry-metrics-kpi--muted .geometry-metrics-kpi__value {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.1rem;
+}
+
+.geometry-metrics-table th,
+.geometry-metrics-table td {
+  text-align: right;
+}
+
+.geometry-metrics-table th:first-child,
+.geometry-metrics-table td:first-child {
+  text-align: left;
 }
 
 .cad-sections-column {
